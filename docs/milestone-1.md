@@ -1,6 +1,6 @@
 # SQLite storage and delivery simulation
 
-Milestone 1 is implemented as an isolated native bridge core. It uses real SQLite files and fake remote APIs. The existing `npm start` entry point still runs the inherited Discord-endpoint connector; no native network adapter or Railway deployment has been enabled.
+Milestone 1 is implemented as an isolated native bridge core. It uses real SQLite files and fake remote APIs. This runbook covers the simulated core. Milestone 3 now wires live native adapters under `npm start`; see [its runbook](milestone-3.md) before starting delivery. Railway deployment remains a later milestone.
 
 ## Run locally
 

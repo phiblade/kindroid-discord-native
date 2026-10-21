@@ -31,6 +31,7 @@ export function assembleBatch(
       JSON.stringify({
         id: message.id,
         speaker: message.speaker,
+        author_id: message.author_id,
         version: message.version,
         offset: message.offset,
         continued: end < message.content.length,

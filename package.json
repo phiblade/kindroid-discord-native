@@ -1,7 +1,7 @@
 {
-  "name": "kindroid-discord",
+  "name": "kindroid-discord-native",
   "version": "1.0.1",
-  "description": "Multi-bot Discord manager for Kindroid AI personas with JIT message fetching",
+  "description": "Durable Discord home-room connector for the native Kindroid API",
   "main": "dist/index.js",
   "scripts": {
     "start": "npm run build && node dist/index.js",
@@ -11,19 +11,18 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "test": "npm run build && node --test test/*.test.cjs",
-    "test:native": "npm run build && node --test test/native.test.cjs test/ingestion.test.cjs",
+    "test:native": "npm run build && node --test test/native.test.cjs test/ingestion.test.cjs test/transports.test.cjs",
     "simulate:native": "npm run build && node dist/native/simulate.js",
     "ingest:native": "npm run build && node dist/native/ingest.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "node scripts/install-hooks.cjs"
+    "prepare": "node scripts/install-hooks.cjs",
+    "start:legacy": "npm run build && node dist/legacy-index.js"
   },
   "keywords": [
     "discord",
-    "bot",
-    "ai",
     "kindroid",
-    "multi-bot"
+    "sqlite"
   ],
   "author": "",
   "license": "MIT",

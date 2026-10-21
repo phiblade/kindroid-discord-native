@@ -23,6 +23,7 @@ export function discordMessage(message: Message): IncomingMessage {
     timestamp: message.createdTimestamp,
     version: message.editedTimestamp ?? 0,
     isDM: !message.inGuild(),
+    nonce: message.nonce == null ? undefined : String(message.nonce),
   };
 }
 
@@ -38,7 +39,9 @@ export function connectDiscordIngestion(
       GatewayIntentBits.MessageContent,
     ],
     partials: [Partials.Message],
+    rest: { retries: 0, timeout: 30000 },
   }),
+  options: { posting?: boolean; onFatal?: (error: unknown) => void } = {},
 ) {
   const config = store.config(bridgeId);
   let stopped = false;
@@ -69,6 +72,15 @@ export function connectDiscordIngestion(
       throw new Error(
         'Home room requires View Channel and Read Message History permissions',
       );
+    if (options.posting) {
+      const send = channel.isThread()
+        ? PermissionFlagsBits.SendMessagesInThreads
+        : PermissionFlagsBits.SendMessages;
+      if (!permissions.has(send))
+        throw new Error(
+          'Home room requires Discord send permission before native delivery',
+        );
+    }
     return channel;
   };
   const intake = new HomeRoomIngestion(
@@ -92,7 +104,11 @@ export function connectDiscordIngestion(
     if (stopped || pendingEdits) return;
     if (retry) clearTimeout(retry);
     if (client.user?.id !== config.botId) {
-      report(new Error('Logged-in Discord bot does not match DISCORD_BOT_ID'));
+      const error = new Error(
+        'Logged-in Discord bot does not match DISCORD_BOT_ID',
+      );
+      report(error);
+      options.onFatal?.(error);
       client.destroy();
       return;
     }
@@ -121,6 +137,7 @@ export function connectDiscordIngestion(
       }
       report(error);
       client.destroy();
+      options.onFatal?.(error);
     }
   };
   client.on(Events.MessageCreate, (message) =>

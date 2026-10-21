@@ -1,6 +1,6 @@
 # Milestone 2: Discord home-room ingestion
 
-The native bridge can now collect live Discord messages into SQLite and recover missed history on startup or reconnect. Kindroid delivery and public Discord posting still use fake adapters in tests. The live ingestion command **only queues messages**; it never marks them delivered using a fake Kin.
+The native bridge can now collect live Discord messages into SQLite and recover missed history on startup or reconnect. Milestone 3 now adds live Kindroid delivery and public posting under `npm start`; this runbook describes the intake-only command. The live ingestion command **only queues messages**; it never marks them delivered using a fake Kin.
 
 ## Run ingestion
 
@@ -22,7 +22,7 @@ npm run ingest:native
 
 Enable the bot's Message Content privileged intent in the Discord Developer Portal. Give it View Channel and Read Message History in its home room. The adapter validates channel access and the bot identity at readiness. It requests guild message events, not DM events, and filters by the exact home-channel ID. A thread is a separate channel; configure its ID if that is the intended home. Invitations and channel access remain administrator-managed.
 
-`npm start` remains the inherited bridge until milestone 3. Do not deploy it expecting the new behavior. Keep the SQLite file and its journals together on persistent storage. Do not run multiple owners against the same database.
+`npm start` now runs full native delivery; see [milestone 3](milestone-3.md) before starting it. Keep the SQLite file and its journals together on persistent storage. Do not run multiple owners against the same database.
 
 ## Boundary and recovery
 

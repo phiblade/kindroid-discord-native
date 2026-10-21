@@ -229,7 +229,9 @@ test('v1 databases upgrade without losing queued messages or boundaries', (t) =>
   const f = fixture(t);
   f.store.ingest('b', msg(10));
   const db = new DatabaseSync(f.path);
-  db.exec('DROP TABLE message_deletions; PRAGMA user_version=1;');
+  db.exec(
+    'DROP TABLE discord_receipts; DROP TABLE native_recovery; DROP TABLE api_cooldown; DROP TABLE api_requests; DROP TABLE message_deletions; PRAGMA user_version=1;',
+  );
   db.close();
   f.reopen();
   assert.equal(f.store.bridge('b').boundary, '10');

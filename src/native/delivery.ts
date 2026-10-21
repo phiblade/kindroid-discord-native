@@ -9,6 +9,7 @@ import {
   NativeReply,
   PermanentFailure,
   RejectedRequest,
+  RetryLater,
 } from './types';
 
 export const systemClock: Clock = {
@@ -36,6 +37,10 @@ export class DeliveryLoop {
     private readonly kin: KinTransport,
     private readonly discord: DiscordTransport,
     private readonly clock: Clock = systemClock,
+    private readonly log: (
+      event: string,
+      detail: Record<string, string | number>,
+    ) => void = () => {},
   ) {
     this.config = store.config(bridgeId);
     this.release = store.claimWorker(bridgeId);
@@ -65,6 +70,9 @@ export class DeliveryLoop {
       })
       .catch((error) => {
         this.fatal = error;
+        this.log('fatal', {
+          error: error instanceof Error ? error.message : 'Database failure',
+        });
       })
       .finally(() => {
         this.running = undefined;
@@ -119,7 +127,13 @@ export class DeliveryLoop {
     let delay = this.delay(
       reconciliation ? operation.checks + 1 : operation.attempts,
     );
-    if (
+    const throttled =
+      error instanceof RetryLater ||
+      (reconciliation && error instanceof RejectedRequest);
+    if (throttled) {
+      state = reconciliation ? 'uncertain' : 'prepared';
+      delay = Math.max(delay, (error as RejectedRequest).retryAfterMs ?? 0);
+    } else if (
       error instanceof PermanentFailure ||
       (reconciliation && operation.checks + 1 >= this.config.maxReconcileChecks)
     )
@@ -133,7 +147,20 @@ export class DeliveryLoop {
         delay = Math.max(delay, error.retryAfterMs);
     }
     const next = this.clock.now() + delay;
-    this.store.defer(kind, operation, state, next, description, reconciliation);
+    this.store.defer(
+      kind,
+      operation,
+      state,
+      next,
+      description,
+      reconciliation && !throttled,
+    );
+    this.log(state, {
+      kind,
+      id: operation.id,
+      retry_at: next,
+      error: description,
+    });
     if (state !== 'blocked') this.waitUntil(next);
   }
 
@@ -171,6 +198,13 @@ export class DeliveryLoop {
     const uncertain =
       batch.state === 'uncertain' || batch.state === 'in_flight';
     const operation = uncertain ? batch : this.store.beginBatch(batch);
+    this.log(uncertain ? 'kindroid_reconcile' : 'kindroid_send', {
+      batch: batch.id,
+      messages: this.store.members(batch.id).length,
+      characters: batch.payload.length,
+      cached: this.store.messages(this.bridgeId).length,
+      pending: this.store.pending(this.bridgeId).length,
+    });
     try {
       if (uncertain) {
         const recovered = await this.kin.reconcile(
@@ -188,6 +222,11 @@ export class DeliveryLoop {
     }
     // Database failures must halt the loop, not masquerade as transport rejection.
     this.store.finishBatch(operation, reply);
+    this.log('kindroid_confirmed', {
+      batch: batch.id,
+      reply_characters: reply.text.length,
+      chunks: this.store.chunks(batch.id).length,
+    });
     return true;
   }
 
@@ -214,6 +253,11 @@ export class DeliveryLoop {
       return false;
     }
     this.store.finishChunk(operation, messageId);
+    this.log('discord_confirmed', {
+      chunk: chunk.id,
+      message: messageId,
+      characters: chunk.content.length,
+    });
     return true;
   }
 }

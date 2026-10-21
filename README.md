@@ -1,111 +1,61 @@
-# Native bridge development
-
-Milestone 2 adds [home-room ingestion and reconnect recovery](docs/milestone-2.md). Run `npm run ingest:native` for intake only; native Kindroid delivery is still pending. `npm start` below remains the inherited runtime. Prettier runs on staged files before every commit via the installed Git hook.
-
 # Kindroid Discord Native
 
-This repository is the starting point for a durable Discord home-room bridge to Kindroid's native API. Milestone 1 now provides SQLite storage and a delivery loop with fake APIs and tests. The live entry point and setup instructions below still describe the inherited Discord-endpoint connector.
-
-- [Run the Milestone 1 simulator and tests](docs/milestone-1.md)
-- [Native bridge design](docs/design.md)
-- [API limits and recovery findings](docs/api-findings.md)
-- [Staged implementation plan](docs/implementation-plan.md)
-
-## Inherited connector documentation
-
-Tutorial on how to use this repo: https://docs.kindroid.ai/official-discord-bot-integration
-
-A Node.js service that manages multiple Discord bots, each tied to a unique Kindroid AI persona. The system uses just-in-time message fetching to provide conversation context without storing large message logs.
-
-## Features
-
-- **Multi-bot** support: Run multiple Discord bots from a single service
-- **Kindroid AI integration**: Each bot is tied to a unique AI persona (via `SHARED_AI_CODE_n`)
-- **JIT message fetching**: Fetches configurable conversation history for servers and direct messages (default: 200 messages)
-- **Caching**: Minimizes redundant Discord API calls
-- **Graceful shutdown**: Bots disconnect on SIGINT/SIGTERM
-- **Configurable NSFW filtering** via environment variables
-
-## Prerequisites
-
-- Node.js 22.13 or higher
-- Discord Bot Token(s) from the [Discord Developer Portal](https://discord.com/developers/applications)
-- Kindroid AI API access (API key and share code)
+A durable Discord home-room connector for one dedicated Kindroid, using the native Kindroid API. Every home-room message is queued in SQLite. The Kin chooses whether to speak; mentions are not required. DMs and other rooms are ignored.
 
 ## Setup
 
-1. **Clone the repository**:
+Use Node **22.13 or later**:
 
-   ```bash
-   git clone https://github.com/KindroidAI/Kindroid-discord.git
-   cd Kindroid-discord
-   ```
+```sh
+npm install
+cp .env.example .env
+```
 
-2. Install dependencies:
+Fill in `.env` with your Discord token, numeric bot user ID, numeric home-channel ID, native Kin ID, and native Kindroid API key. If `.env` already exists, update it rather than replacing it. Native API keys are available in Kindroid under Profile → Preferences → API & Integrations. Old share codes, numbered bot tokens, and the Discord-dedicated inference URL are not used by this runtime.
 
-   ```bash
-   npm install
-   ```
+Enable Message Content Intent in the Discord Developer Portal. Grant the bot View Channel, Read Message History, and Send Messages in its home room (Send Messages in Threads for a thread).
 
-3. Copy and configure .env:
+Configure the Kin with the [bridge instructions](docs/milestone-3.md#kin-instructions). Use a dedicated Kin conversation and only one process for this bot/Kin. The original connector is a separate project: stop its use of the same bot in this room, or use a separate test bot, before testing public replies.
 
-   ```bash
-   cp .env.example .env
-   ```
+```sh
+npm start
+```
 
-4. Fill in your KINDROID_API_KEY, KINDROID_INFER_URL, and bot tokens (BOT_TOKEN_n).
-   Provide SHARED_AI_CODE_n for each bot's AI persona.
+**This sends real messages.** After Discord catch-up completes, it delivers existing pending SQLite messages to Kindroid and posts substantive replies to the home room. To collect messages without sending them, use:
 
-5. Run in development mode:
+```sh
+npm run ingest:native
+```
 
-   ```bash
-   npm run dev
-   ```
+Stop ingestion before starting native delivery. Do not run both commands against the same database. `.env` and local SQLite files are excluded from Git. On Railway, use one service/process and a persistent volume; deployment and backup/restore verification remain milestone 4.
 
-   For production:
+## Behavior
 
-   ```bash
-   npm run build
-   npm start
-   ```
+- The first new eligible message establishes a permanent boundary; older room history is excluded.
+- Startup/reconnect backfill fills the gap before new Kindroid requests. SQLite deduplicates overlapping events.
+- One asynchronous delivery loop sends the oldest pending messages within a configurable batch budget. New arrivals persist while generation runs.
+- Exact trimmed `none.` and `more.` replies stay private. Other replies are posted, even during catch-up, in persisted chunks of at most 2,000 UTF-16 units.
+- Edits replace unattempted queued text. Attempted snapshots stay immutable; later edits are retained but not redelivered. Live deletes cancel unattempted work. Offline deletion reconciliation is deferred.
+- Known participant mentions are allowed; role and everyone notifications are disabled.
+- Unknown send/post outcomes are reconciled conservatively and eventually blocked if evidence is insufficient. The bridge never treats “not found” as permission to resend.
 
-## Configuration
+See [milestone 3](docs/milestone-3.md) for configuration, recovery limitations, and the live test procedure. The API wire shapes are tested with mocked HTTP/Discord responses; no automated test modifies a real Kin or Discord channel.
 
-Use environment variables to configure your bots. The .env.example file shows usage:
+## Development
 
-- KINDROID_INFER_URL: The Kindroid AI API endpoint, and should not change
-- KINDROID_API_KEY: Your Kindroid AI API key
-- KINDROID_MESSAGE_CONTEXT: (Optional) Maximum number of recent messages sent to Kindroid in servers and direct messages. Must be an integer from 1 to 1000; defaults to 200. Set it in `.env` or your hosting environment and restart the service. This replaces `CURRENT_MESSAGE_CONTEXT`.
-- DISCORD_FETCH_BATCH: (Optional) Discord initial fetch page size, an integer from 1 to 100; defaults to 100. Incremental checks use the smaller of this value and 10. This replaces the old `MESSAGE_FETCH_LIMIT` setting.
-- CONTENT_PREPEND_SPEAKER: (Optional) Defaults to `yes`. Prefixes message text sent to Kindroid with the speaker label, for example `[Alex]: Hello` or `[{{ai}}]: Hi`. Set to `no` to send the original text. Also accepts `true`/`false` or `1`/`0`, case-insensitively. Applies to both servers and DMs; the `username` field and cached Discord content remain unchanged.
+```sh
+npm test
+npm run lint
+npm run simulate:native
+npm run format:check
+```
 
-History is cached in memory separately for each bot and channel. The first request fetches pages of up to `DISCORD_FETCH_BATCH` messages until the context is full or history runs out. Every later request fetches the latest messages and pages backward in batches of up to 10 (capped by `DISCORD_FETCH_BATCH`) until it finds cached messages, reaches the start of history, or gathers a full new context. New messages are merged by Discord message ID, the cache is trimmed to the newest 1,000 messages when it grows beyond that size, and Kindroid receives only the newest `KINDROID_MESSAGE_CONTEXT` messages, oldest-first. Short channels are checked for new messages without repeatedly loading their entire history. Caches refill after a restart. Edits to fetched messages are refreshed; older edits and deletions are not reconciled by this incremental algorithm.
+Prettier runs on staged files before every commit through Husky/lint-staged. `npm run format` formats the repository; `npm run prepare` reinstalls the hook.
 
-On Railway, set `KINDROID_MESSAGE_CONTEXT=200` and `DISCORD_FETCH_BATCH=100` in the service variables; the local `.env` is ignored by Git.
+The inherited connector source and tests remain for reference. It is only started explicitly with `npm run start:legacy`; native startup never falls back to the old endpoint.
 
-- SHARED_AI_CODE_n: The share code to identify which AI persona to use for the n-th bot
-- BOT_TOKEN_n: Discord bot token for the n-th bot
-- ENABLE_FILTER_n: (Optional) true or false to enable NSFW filtering for the n-th bot
-
-You can create as many bots as you want by incrementing the number (\_1, \_2, \_3, etc.).
-
-## Error Handling
-
-Runtime logs include `[History bot=... channel=...]` entries for each Discord page (requested and received counts) and a refresh summary (fetched, new, cached before/after, trimmed, and selected context counts). `[Kindroid bot=... channel=...]` entries report the actual outgoing message count before the request and confirm successful responses. These count logs do not include message contents or credentials. `fetched` includes messages already present in the cache; `new` counts only previously uncached message IDs.
-
-- Failed bot initialization is logged; other bots still initialize
-- Conversation fetch failures are caught and logged
-- API call errors log diagnostic info and return a friendly user message
-- SIGINT or SIGTERM triggers a graceful shutdown of all bots
-
-## Contributing
-
-1. Fork this repository
-2. Create your feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add some amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License.
+- [Design](docs/design.md)
+- [Milestones](docs/implementation-plan.md)
+- [API findings and verification checklist](docs/api-findings.md)
+- [Storage simulation](docs/milestone-1.md)
+- [Discord ingestion](docs/milestone-2.md)

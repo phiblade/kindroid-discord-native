@@ -18,6 +18,7 @@ export interface IncomingMessage {
   timestamp: number;
   isDM?: boolean;
   version?: number;
+  nonce?: string;
 }
 
 export interface StoredMessage {
@@ -100,3 +101,6 @@ export class RejectedRequest extends Error {
   }
 }
 export class PermanentFailure extends Error {}
+
+/** Local rate/catch-up scheduling; no remote outcome inference. */
+export class RetryLater extends RejectedRequest {}

@@ -50,15 +50,29 @@ export class BridgeStore {
     const version = this.one<{ user_version: number }>(
       'PRAGMA user_version',
     )!.user_version;
-    if (version > 2)
+    if (version > 3)
       throw new Error('Database schema is newer than this bridge');
-    if (version === 2) return;
+    if (version === 3) return;
+    if (version === 2) {
+      this.transaction('migration3', () =>
+        this.db.exec(`
+        CREATE TABLE api_requests (at INTEGER NOT NULL, history INTEGER NOT NULL) STRICT;
+        CREATE INDEX api_request_time ON api_requests(at);
+        CREATE TABLE api_cooldown (id INTEGER PRIMARY KEY CHECK(id=1), until INTEGER NOT NULL) STRICT;
+        CREATE TABLE native_recovery (batch_id TEXT PRIMARY KEY REFERENCES batches(id), cursor REAL, matched_id TEXT) STRICT;
+        CREATE TABLE discord_receipts (nonce TEXT PRIMARY KEY REFERENCES chunks(nonce), message_id TEXT NOT NULL) STRICT;
+        PRAGMA user_version=3;
+      `),
+      );
+      return;
+    }
     if (version === 1) {
       this.transaction('migration2', () =>
         this.db.exec(`CREATE TABLE message_deletions (
         bridge_id TEXT NOT NULL REFERENCES bridges(id), id TEXT NOT NULL,
         PRIMARY KEY(bridge_id,id)) STRICT; PRAGMA user_version=2;`),
       );
+      this.migrate();
       return;
     }
     this.transaction('migration', () =>
@@ -113,6 +127,7 @@ export class BridgeStore {
       PRAGMA user_version=2;
     `),
     );
+    this.migrate();
   }
 
   private one<T>(sql: string, ...params: SQLInputValue[]): T | undefined {
@@ -278,6 +293,19 @@ export class BridgeStore {
       (event.version ?? 0) < 0
     )
       throw new Error('Invalid message timestamp or version');
+    if (event.authorId === config.botId && event.nonce) {
+      const chunk = this.one<{ content: string }>(
+        `SELECT c.content FROM chunks c JOIN batches b ON b.id=c.batch_id WHERE c.nonce=? AND b.bridge_id=? AND c.attempts>0`,
+        event.nonce,
+        id,
+      );
+      if (chunk && chunk.content === event.content)
+        this.run(
+          'INSERT OR IGNORE INTO discord_receipts VALUES(?,?)',
+          event.nonce,
+          event.id,
+        );
+    }
     const bridge = this.bridge(id);
     if (this.isDeleted(id, event.id)) return 'ignored';
     if (bridge.boundary && BigInt(event.id) < BigInt(bridge.boundary))
@@ -393,6 +421,72 @@ export class BridgeStore {
         id,
       );
     });
+  }
+
+  /** Account-wide within this database; reserve before issuing HTTP, including failed calls. */
+  reserveApiRequest(now: number, history: boolean): number {
+    return this.transaction('apiReserve', () => {
+      this.run('DELETE FROM api_requests WHERE at<=?', now - 86400000);
+      const cooldown =
+        this.one<{ until: number }>('SELECT until FROM api_cooldown WHERE id=1')
+          ?.until ?? 0;
+      const recent = this.all<{ at: number }>(
+        'SELECT at FROM api_requests WHERE at>? ORDER BY at',
+        now - 30000,
+      );
+      const daily = history
+        ? this.all<{ at: number }>(
+            'SELECT at FROM api_requests WHERE history=1 ORDER BY at',
+          )
+        : [];
+      const until = Math.max(
+        cooldown,
+        recent.length >= 10 ? recent[recent.length - 10].at + 30000 : 0,
+        daily.length >= 600 ? daily[daily.length - 600].at + 86400000 : 0,
+      );
+      if (until > now) return until - now;
+      this.run('INSERT INTO api_requests VALUES(?,?)', now, history ? 1 : 0);
+      return 0;
+    });
+  }
+  deferApiUntil(until: number): void {
+    this.transaction('apiCooldown', () =>
+      this.run(
+        'INSERT INTO api_cooldown VALUES(1,?) ON CONFLICT(id) DO UPDATE SET until=max(until,excluded.until)',
+        until,
+      ),
+    );
+  }
+  nativeRecovery(batchId: string): {
+    cursor: number | null;
+    matched_id: string | null;
+  } {
+    return (
+      this.one(
+        'SELECT cursor,matched_id FROM native_recovery WHERE batch_id=?',
+        batchId,
+      ) ?? { cursor: null, matched_id: null }
+    );
+  }
+  saveNativeRecovery(
+    batchId: string,
+    cursor: number | null,
+    matchedId: string | null,
+  ): void {
+    this.transaction('nativeRecovery', () =>
+      this.run(
+        'INSERT INTO native_recovery VALUES(?,?,?) ON CONFLICT(batch_id) DO UPDATE SET cursor=excluded.cursor,matched_id=excluded.matched_id',
+        batchId,
+        cursor,
+        matchedId,
+      ),
+    );
+  }
+  discordReceipt(nonce: string): string | undefined {
+    return this.one<{ message_id: string }>(
+      'SELECT message_id FROM discord_receipts WHERE nonce=?',
+      nonce,
+    )?.message_id;
   }
 
   isDeleted(id: string, messageId: string): boolean {

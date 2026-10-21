@@ -92,7 +92,7 @@ Example: the first of five messages arrives and starts generation; the other fou
 
 A timeout or server failure is not proof that a batch was rejected. Persist the batch marker, exact payload, and attempt metadata before the network call. Never automatically retry a non-idempotent send merely because its response was lost.
 
-Proposed recovery uses native conversation history and a persisted cursor with overlap/deduplication to avoid timestamp-boundary omissions. Match the exact marked user batch and its associated reply. If both exist, recover the reply. If only the user batch exists, wait for completion; if neither appears, a single check is not proof of absence. Use bounded checks and flag unresolved cases instead of guessing. Freeze later sends for that kin while its previous outcome remains uncertain; continue saving Discord input.
+Recovery uses native conversation history and the documented persisted timestamp cursor. Timestamp-boundary behavior still requires live verification; unexpected ordering or missing evidence must remain unresolved rather than imply delivery. Match the exact marked user batch and its associated reply. If both exist, recover the reply. If only the user batch exists, wait for completion; if neither appears, a single check is not proof of absence. Use bounded checks and flag unresolved cases instead of guessing. Freeze later sends for that kin while its previous outcome remains uncertain; continue saving Discord input.
 
 No exactly-once guarantee is claimed. History visibility delay, marker preservation, response association, and partial generation failures require controlled API verification. Restoring an older backup may resurrect already completed work, so recovery must reconcile remote state before resuming sends.
 
@@ -119,5 +119,5 @@ Log counts and identifiers for received messages, pending backlog, batch length,
 - Verify the assumed 4,000-character native input budget, Unicode counting, rejection behavior, and recovery markers.
 - Specify edits/deletions after delivery. Pending edits can replace unsent text; in-flight snapshots must remain immutable. Corrections to delivered messages need a separate agreed policy. Offline deletions may be unrecoverable.
 - Specify attachment, embed, sticker, and non-text message representation; first milestone tests text only.
-- Choose configuration names for home channel, Kin ID, database path, mentions, retries, and pruning. These are proposals until implementation.
+- Configuration names are now implemented in `.env.example`; explicit post-history configuration migrations and operator resolution tooling remain to be designed.
 - Account for proactive/native app activity if enabled. Exclusive use is the user's operating responsibility; the initial bridge is not a general two-way mirror of all native chat activity.

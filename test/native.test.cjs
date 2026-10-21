@@ -134,7 +134,7 @@ test('schema, WAL, full sync, exclusive process owner, and durable boundary', as
   assert.equal(f.store.ingest('bridge', message(19)), 'ignored');
   assert.equal(f.store.ingest('bridge', message(20)), 'duplicate');
   const db = new DatabaseSync(f.path);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
   assert.equal(db.prepare('PRAGMA journal_mode').get().journal_mode, 'wal');
   assert.equal(
     db.prepare('PRAGMA integrity_check').get().integrity_check,

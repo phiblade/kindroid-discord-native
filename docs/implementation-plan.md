@@ -1,6 +1,6 @@
 # Native bridge implementation plan
 
-This plan implements [the agreed design](design.md) incrementally. The existing runtime is still the inherited Discord-endpoint bridge. Milestone 1 is implemented and tested against fake APIs; see [its runbook](milestone-1.md). Do not deploy the inherited entry point expecting native behavior.
+This plan implements [the agreed design](design.md) incrementally. Milestones 1–3 are implemented with automated tests. `npm start` now runs the native connector; [milestone 3](milestone-3.md) describes setup and the remaining live verification.
 
 ## Milestone 1 Storage and delivery simulation
 
@@ -30,6 +30,8 @@ Connect the home-room event handler and recovery pagination. Persist every eligi
 Test restart after missed messages, multiple pages of backlog, events during backfill, bot-authored messages, and gateway events arriving before posting acknowledgments. A recovered gap must not reorder outbound history.
 
 ## Milestone 3 Native delivery and public replies
+
+Status: implemented and tested with mocked HTTP/Discord responses. Live contract verification and deployment remain part of the controlled trial.
 
 Replace share-code calls with native Kin ID delivery. Add the shared account limiter, error classification, history reconciliation, and exact reply protocol. Complete durable Discord chunk posting in the existing loop, with nonce enforcement and uncertain-post recovery.
 
