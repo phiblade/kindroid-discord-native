@@ -33,7 +33,8 @@ export interface StoredMessage {
   state: 'pending' | 'in_flight' | 'uncertain' | 'delivered';
 }
 
-export type OperationState = 'prepared' | 'in_flight' | 'uncertain' | 'confirmed' | 'blocked';
+export type OperationState =
+  'prepared' | 'in_flight' | 'uncertain' | 'confirmed' | 'blocked';
 export interface Batch {
   id: string;
   bridge_id: string;
@@ -67,16 +68,23 @@ export interface BatchMember {
   start: number;
   end: number;
 }
-export interface NativeReply { text: string; nativeId?: string }
+export interface NativeReply {
+  text: string;
+  nativeId?: string;
+}
 // A missing history match is deliberately NOT evidence that sending is safe.
-export type Reconciliation<T> = { status: 'found'; result: T } | { status: 'unknown' };
+export type Reconciliation<T> =
+  { status: 'found'; result: T } | { status: 'unknown' };
 export interface KinTransport {
   send(kinId: string, batch: Batch): Promise<NativeReply>;
   reconcile(kinId: string, batch: Batch): Promise<Reconciliation<NativeReply>>;
 }
 export interface DiscordTransport {
   post(channelId: string, chunk: Chunk): Promise<{ messageId: string }>;
-  reconcile(channelId: string, chunk: Chunk): Promise<Reconciliation<{ messageId: string }>>;
+  reconcile(
+    channelId: string,
+    chunk: Chunk,
+  ): Promise<Reconciliation<{ messageId: string }>>;
 }
 export interface Clock {
   now(): number;
@@ -84,6 +92,11 @@ export interface Clock {
 }
 // Only transports that can prove rejection should use RejectedRequest.
 export class RejectedRequest extends Error {
-  constructor(message: string, public readonly retryAfterMs?: number) { super(message); }
+  constructor(
+    message: string,
+    public readonly retryAfterMs?: number,
+  ) {
+    super(message);
+  }
 }
 export class PermanentFailure extends Error {}

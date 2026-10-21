@@ -8,10 +8,13 @@ import {
   BaseGuildTextChannel,
   PermissionFlagsBits,
   Partials,
-} from "discord.js";
-import { ephemeralFetchConversation, shouldPrependSpeaker } from "./messageFetch";
-import { callKindroidAI } from "./kindroidAPI";
-import { BotConfig, DMConversationCount } from "./types";
+} from 'discord.js';
+import {
+  ephemeralFetchConversation,
+  shouldPrependSpeaker,
+} from './messageFetch';
+import { callKindroidAI } from './kindroidAPI';
+import { BotConfig, DMConversationCount } from './types';
 
 //Bot back and forth (prevent infinite loop but allow for mentioning other bots in conversation)
 type BotConversationChain = {
@@ -40,7 +43,7 @@ function shouldAllowBotMessage(message: Message): boolean {
   // Get (or initialize) the chain data for this channel
   const chainData = botToBotChains.get(channelId) || {
     chainCount: 0,
-    lastBotId: "",
+    lastBotId: '',
     lastActivity: 0,
   };
 
@@ -54,7 +57,7 @@ function shouldAllowBotMessage(message: Message): boolean {
   // If too much time passed, reset the chain
   if (timeSinceLast > INACTIVITY_RESET) {
     chainData.chainCount = 0;
-    chainData.lastBotId = "";
+    chainData.lastBotId = '';
   }
 
   // If this message is from a *different* bot ID than before, increment chain
@@ -78,7 +81,7 @@ function shouldAllowBotMessage(message: Message): boolean {
 
 // Helper function to check if the bot can respond to a channel before responding
 async function canRespondToChannel(
-  channel: Message["channel"]
+  channel: Message['channel'],
 ): Promise<boolean> {
   try {
     // For DM channels, we only need to check if we can send messages
@@ -108,7 +111,7 @@ async function canRespondToChannel(
 
     return false;
   } catch (error) {
-    console.error("Error checking permissions:", error);
+    console.error('Error checking permissions:', error);
     return false;
   }
 }
@@ -120,7 +123,7 @@ async function canRespondToChannel(
 async function createDiscordClientForBot(
   botConfig: BotConfig,
   kindroidMessageContext: number,
-  discordFetchBatch: number
+  discordFetchBatch: number,
 ): Promise<Client> {
   const client = new Client({
     intents: [
@@ -133,12 +136,12 @@ async function createDiscordClientForBot(
   });
 
   // Set up event handlers
-  client.once("ready", () => {
+  client.once('ready', () => {
     console.log(`Bot [${botConfig.id}] logged in as ${client.user?.tag}`);
   });
 
   // Handle incoming messages
-  client.on("messageCreate", async (message: Message) => {
+  client.on('messageCreate', async (message: Message) => {
     // If the message is from the same bot, skip (avoid self-mention loops)
     if (message.author.bot && message.author.id === client.user?.id) {
       return;
@@ -160,7 +163,12 @@ async function createDiscordClientForBot(
 
     // Handle DMs differently from server messages
     if (message.channel.type === ChannelType.DM) {
-      await handleDirectMessage(message, botConfig, kindroidMessageContext, discordFetchBatch);
+      await handleDirectMessage(
+        message,
+        botConfig,
+        kindroidMessageContext,
+        discordFetchBatch,
+      );
       return;
     }
 
@@ -190,7 +198,7 @@ async function createDiscordClientForBot(
       const conversationArray = await ephemeralFetchConversation(
         message.channel as TextChannel | DMChannel,
         kindroidMessageContext,
-        discordFetchBatch
+        discordFetchBatch,
       );
 
       // Call Kindroid AI with the conversation context
@@ -198,11 +206,11 @@ async function createDiscordClientForBot(
         botConfig.sharedAiCode,
         conversationArray,
         botConfig.enableFilter,
-        { botId: botUser.id, channelId: message.channel.id }
+        { botId: botUser.id, channelId: message.channel.id },
       );
 
       // If rate limited, silently ignore
-      if (aiResult.type === "rate_limited") {
+      if (aiResult.type === 'rate_limited') {
         return;
       }
 
@@ -218,7 +226,7 @@ async function createDiscordClientForBot(
     } catch (error) {
       console.error(`[Bot ${botConfig.id}] Error:`, error);
       const errorMessage =
-        "Beep boop, something went wrong. Please contact the Kindroid owner if this keeps up!";
+        'Beep boop, something went wrong. Please contact the Kindroid owner if this keeps up!';
       if (isMentioned) {
         await message.reply(errorMessage);
       } else if (
@@ -231,7 +239,7 @@ async function createDiscordClientForBot(
   });
 
   // Handle errors
-  client.on("error", (error: Error) => {
+  client.on('error', (error: Error) => {
     console.error(`[Bot ${botConfig.id}] WebSocket error:`, error);
   });
 
@@ -256,7 +264,7 @@ async function handleDirectMessage(
   message: Message,
   botConfig: BotConfig,
   kindroidMessageContext: number,
-  discordFetchBatch: number
+  discordFetchBatch: number,
 ): Promise<void> {
   const userId = message.author.id;
   const dmKey = `${botConfig.id}-${userId}`;
@@ -282,7 +290,7 @@ async function handleDirectMessage(
       const conversationArray = await ephemeralFetchConversation(
         message.channel,
         kindroidMessageContext,
-        discordFetchBatch
+        discordFetchBatch,
       );
 
       // Call Kindroid AI
@@ -290,11 +298,14 @@ async function handleDirectMessage(
         botConfig.sharedAiCode,
         conversationArray,
         botConfig.enableFilter,
-        { botId: message.channel.client.user?.id ?? botConfig.id, channelId: message.channel.id }
+        {
+          botId: message.channel.client.user?.id ?? botConfig.id,
+          channelId: message.channel.id,
+        },
       );
 
       // If rate limited, silently ignore
-      if (aiResult.type === "rate_limited") {
+      if (aiResult.type === 'rate_limited') {
         return;
       }
 
@@ -304,7 +315,7 @@ async function handleDirectMessage(
   } catch (error) {
     console.error(`[Bot ${botConfig.id}] DM Error:`, error);
     await message.reply(
-      "Beep boop, something went wrong. Please contact the Kindroid owner if this keeps up!"
+      'Beep boop, something went wrong. Please contact the Kindroid owner if this keeps up!',
     );
   }
 }
@@ -314,39 +325,55 @@ async function handleDirectMessage(
  * @param botConfigs - Array of bot configurations
  */
 async function initializeAllBots(botConfigs: BotConfig[]): Promise<Client[]> {
-  const kindroidMessageContext = Number(process.env.KINDROID_MESSAGE_CONTEXT ?? "200");
+  const kindroidMessageContext = Number(
+    process.env.KINDROID_MESSAGE_CONTEXT ?? '200',
+  );
   if (
     !Number.isInteger(kindroidMessageContext) ||
     kindroidMessageContext < 1 ||
     kindroidMessageContext > 1000
   ) {
-    throw new Error("KINDROID_MESSAGE_CONTEXT must be an integer between 1 and 1000");
+    throw new Error(
+      'KINDROID_MESSAGE_CONTEXT must be an integer between 1 and 1000',
+    );
   }
 
-  const discordFetchBatch = Number(process.env.DISCORD_FETCH_BATCH ?? "100");
-  if (!Number.isInteger(discordFetchBatch) || discordFetchBatch < 1 || discordFetchBatch > 100) {
-    throw new Error("DISCORD_FETCH_BATCH must be an integer between 1 and 100");
+  const discordFetchBatch = Number(process.env.DISCORD_FETCH_BATCH ?? '100');
+  if (
+    !Number.isInteger(discordFetchBatch) ||
+    discordFetchBatch < 1 ||
+    discordFetchBatch > 100
+  ) {
+    throw new Error('DISCORD_FETCH_BATCH must be an integer between 1 and 100');
   }
 
   console.log(`Discord fetch batch: ${discordFetchBatch} messages`);
-  console.log(`Prepend speaker to content: ${shouldPrependSpeaker() ? "yes" : "no"}`);
-  console.log(`Conversation context: ${kindroidMessageContext} messages (servers and DMs)`);
+  console.log(
+    `Prepend speaker to content: ${shouldPrependSpeaker() ? 'yes' : 'no'}`,
+  );
+  console.log(
+    `Conversation context: ${kindroidMessageContext} messages (servers and DMs)`,
+  );
   console.log(`Initializing ${botConfigs.length} bots...`);
 
   const initPromises = botConfigs.map((config) =>
-    createDiscordClientForBot(config, kindroidMessageContext, discordFetchBatch).catch((error) => {
+    createDiscordClientForBot(
+      config,
+      kindroidMessageContext,
+      discordFetchBatch,
+    ).catch((error) => {
       console.error(`Failed to initialize bot ${config.id}:`, error);
       return null;
-    })
+    }),
   );
 
   const results = await Promise.all(initPromises);
   const successfulBots = results.filter(
-    (client): client is Client => client !== null
+    (client): client is Client => client !== null,
   );
 
   console.log(
-    `Successfully initialized ${successfulBots.length} out of ${botConfigs.length} bots`
+    `Successfully initialized ${successfulBots.length} out of ${botConfigs.length} bots`,
   );
 
   return successfulBots;
@@ -356,7 +383,7 @@ async function initializeAllBots(botConfigs: BotConfig[]): Promise<Client[]> {
  * Gracefully shutdown all active bots
  */
 async function shutdownAllBots(): Promise<void> {
-  console.log("Shutting down all bots...");
+  console.log('Shutting down all bots...');
 
   const shutdownPromises = Array.from(activeBots.entries()).map(
     async ([id, client]) => {
@@ -366,7 +393,7 @@ async function shutdownAllBots(): Promise<void> {
       } catch (error) {
         console.error(`Error shutting down bot ${id}:`, error);
       }
-    }
+    },
   );
 
   await Promise.all(shutdownPromises);

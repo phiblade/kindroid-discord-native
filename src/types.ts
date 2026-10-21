@@ -25,9 +25,9 @@ export interface DMConversationCount {
 
 export type KindroidAIResult =
   | {
-      type: "success";
+      type: 'success';
       reply: string;
     }
   | {
-      type: "rate_limited";
+      type: 'rate_limited';
     };

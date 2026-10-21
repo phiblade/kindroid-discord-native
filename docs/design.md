@@ -48,12 +48,12 @@ Proposed implementation: SQLite on a persistent volume, WAL mode, `synchronous=F
 
 Proposed logical records:
 
-| Record | Purpose |
-| --- | --- |
-| Bridge | Bot, home channel, kin, permanent starting message, recovery cursor |
-| Message | Discord ID, author, speaker label, content/version, timestamp, deletion state, origin, delivery state |
-| Batch and members | Immutable exact payload, member versions/fragments, attempts, retry time, state, recovered native IDs |
-| Reply and chunks | Full native reply, ordered Discord chunks, persisted nonce per chunk, posting state, confirmed Discord IDs |
+| Record            | Purpose                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| Bridge            | Bot, home channel, kin, permanent starting message, recovery cursor                                        |
+| Message           | Discord ID, author, speaker label, content/version, timestamp, deletion state, origin, delivery state      |
+| Batch and members | Immutable exact payload, member versions/fragments, attempts, retry time, state, recovered native IDs      |
+| Reply and chunks  | Full native reply, ordered Discord chunks, persisted nonce per chunk, posting state, confirmed Discord IDs |
 
 Messages and delivery state live in the same database. Batch records preserve the exact bytes and versions involved in each attempted exchange; they do not duplicate a separate authoritative message cache.
 

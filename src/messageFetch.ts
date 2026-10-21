@@ -1,5 +1,5 @@
-import { TextChannel, DMChannel, Message } from "discord.js";
-import { ConversationMessage } from "./types";
+import { TextChannel, DMChannel, Message } from 'discord.js';
+import { ConversationMessage } from './types';
 
 // Track message cache with proper typing
 interface CacheEntry {
@@ -46,7 +46,7 @@ async function getUserDisplayName(msg: Message): Promise<string> {
       try {
         const guild = msg.client.guilds.cache.get(msg.guildId);
         if (!guild) {
-          throw new Error("Guild not found in cache");
+          throw new Error('Guild not found in cache');
         }
 
         const member = await guild.members.fetch(msg.author.id);
@@ -58,7 +58,7 @@ async function getUserDisplayName(msg: Message): Promise<string> {
           displayName = msg.author.username;
         }
       } catch (error) {
-        console.error("Error fetching guild member:", error);
+        console.error('Error fetching guild member:', error);
         displayName = msg.author.globalName || msg.author.username;
       }
     } else {
@@ -83,32 +83,37 @@ async function getUserDisplayName(msg: Message): Promise<string> {
 
     return displayName;
   } catch (error) {
-    console.error("Error getting display name:", error);
+    console.error('Error getting display name:', error);
     return msg.author.username;
   }
 }
 
 export function shouldPrependSpeaker(): boolean {
-  const value = (process.env.CONTENT_PREPEND_SPEAKER ?? "yes").trim().toLowerCase();
-  if (["yes", "true", "1"].includes(value)) return true;
-  if (["no", "false", "0"].includes(value)) return false;
-  throw new Error("CONTENT_PREPEND_SPEAKER must be yes/no, true/false, or 1/0");
+  const value = (process.env.CONTENT_PREPEND_SPEAKER ?? 'yes')
+    .trim()
+    .toLowerCase();
+  if (['yes', 'true', '1'].includes(value)) return true;
+  if (['no', 'false', '0'].includes(value)) return false;
+  throw new Error('CONTENT_PREPEND_SPEAKER must be yes/no, true/false, or 1/0');
 }
 
 /** Format the cache for the requesting bot, oldest message first. */
 async function formatConversation(
   messages: Message[],
-  botId: string
+  botId: string,
 ): Promise<ConversationMessage[]> {
   const prependSpeaker = shouldPrependSpeaker();
-  return Promise.all(messages.map(async (msg) => {
-    const username = msg.author.id === botId ? "{{ai}}" : await getUserDisplayName(msg);
-    return {
-      username,
-      text: prependSpeaker ? `[${username}]: ${msg.content}` : msg.content,
-      timestamp: msg.createdAt.toISOString(),
-    };
-  }));
+  return Promise.all(
+    messages.map(async (msg) => {
+      const username =
+        msg.author.id === botId ? '{{ai}}' : await getUserDisplayName(msg);
+      return {
+        username,
+        text: prependSpeaker ? `[${username}]: ${msg.content}` : msg.content,
+        timestamp: msg.createdAt.toISOString(),
+      };
+    }),
+  );
 }
 
 // Snowflakes provide a stable order even when messages share a timestamp.
@@ -121,7 +126,7 @@ async function updateConversation(
   contextSize: number,
   fetchBatch: number,
   cacheKey: string,
-  botId: string
+  botId: string,
 ): Promise<ConversationMessage[]> {
   const existing = channelCache.get(cacheKey);
   const cached = existing?.contextSize === contextSize ? existing : undefined;
@@ -134,13 +139,19 @@ async function updateConversation(
   let before: string | undefined;
 
   while (fetchedIds.size < contextSize) {
-    const limit = cached ? Math.min(10, fetchBatch) : Math.min(fetchBatch, contextSize - fetchedIds.size);
-    const fetched = await channel.messages.fetch({ limit, before, cache: false });
+    const limit = cached
+      ? Math.min(10, fetchBatch)
+      : Math.min(fetchBatch, contextSize - fetchedIds.size);
+    const fetched = await channel.messages.fetch({
+      limit,
+      before,
+      cache: false,
+    });
     const page = Array.from(fetched.values()).sort(newestFirst);
     pages++;
     fetchedCount += page.length;
     console.log(
-      `${logPrefix} fetch page=${pages} requested=${limit} received=${page.length}`
+      `${logPrefix} fetch page=${pages} requested=${limit} received=${page.length}`,
     );
     if (page.length === 0) break;
 
@@ -151,27 +162,35 @@ async function updateConversation(
     }
     const oldestId = page[page.length - 1].id;
     if (before && BigInt(oldestId) >= BigInt(before)) {
-      throw new Error("Discord message pagination did not advance");
+      throw new Error('Discord message pagination did not advance');
     }
     // Once a whole context of newer messages is collected, older history
     // cannot affect the result, even if the previous cache is far behind.
-    if (overlaps || page.length < limit || fetchedIds.size >= contextSize) break;
+    if (overlaps || page.length < limit || fetchedIds.size >= contextSize)
+      break;
     before = oldestId;
   }
 
-  const retained = Array.from(messages.values()).sort(newestFirst).slice(0, 1000);
-  const conversation = await formatConversation(retained.slice(0, contextSize).reverse(), botId);
+  const retained = Array.from(messages.values())
+    .sort(newestFirst)
+    .slice(0, 1000);
+  const conversation = await formatConversation(
+    retained.slice(0, contextSize).reverse(),
+    botId,
+  );
   channelCache.delete(cacheKey);
   channelCache.set(cacheKey, {
     contextSize,
     messages: new Map(retained.map((msg) => [msg.id, msg])),
   });
-  const newCount = Array.from(fetchedIds).filter((id) => !cached?.messages.has(id)).length;
+  const newCount = Array.from(fetchedIds).filter(
+    (id) => !cached?.messages.has(id),
+  ).length;
   console.log(
-    `${logPrefix} refreshed mode=${cached ? "incremental" : "initial"}` +
-    ` pages=${pages} fetched=${fetchedCount} new=${newCount}` +
-    ` cached_before=${cached?.messages.size ?? 0} cached_after=${retained.length}` +
-    ` trimmed=${messages.size - retained.length} context=${conversation.length}`
+    `${logPrefix} refreshed mode=${cached ? 'incremental' : 'initial'}` +
+      ` pages=${pages} fetched=${fetchedCount} new=${newCount}` +
+      ` cached_before=${cached?.messages.size ?? 0} cached_after=${retained.length}` +
+      ` trimmed=${messages.size - retained.length} context=${conversation.length}`,
   );
   // Bound inactive channel caches; evicted channels refill on their next use.
   if (channelCache.size > 1000) {
@@ -185,26 +204,31 @@ async function updateConversation(
 async function ephemeralFetchConversation(
   channel: TextChannel | DMChannel,
   contextSize: number = 200,
-  fetchBatch: number = 100
+  fetchBatch: number = 100,
 ): Promise<ConversationMessage[]> {
   if (!Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1000) {
-    throw new Error("KINDROID_MESSAGE_CONTEXT must be an integer between 1 and 1000");
+    throw new Error(
+      'KINDROID_MESSAGE_CONTEXT must be an integer between 1 and 1000',
+    );
   }
   if (!Number.isInteger(fetchBatch) || fetchBatch < 1 || fetchBatch > 100) {
-    throw new Error("DISCORD_FETCH_BATCH must be an integer between 1 and 100");
+    throw new Error('DISCORD_FETCH_BATCH must be an integer between 1 and 100');
   }
   const botId = channel.client.user?.id;
-  if (!botId) throw new Error("Bot client ID not found");
+  if (!botId) throw new Error('Bot client ID not found');
   const cacheKey = `${botId}:${channel.id}`;
   const previous = pendingFetches.get(cacheKey);
-  const current = (previous ?? Promise.resolve()).catch(() => undefined).then(
-    () => updateConversation(channel, contextSize, fetchBatch, cacheKey, botId)
-  );
+  const current = (previous ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(() =>
+      updateConversation(channel, contextSize, fetchBatch, cacheKey, botId),
+    );
   pendingFetches.set(cacheKey, current);
   try {
     return await current;
   } finally {
-    if (pendingFetches.get(cacheKey) === current) pendingFetches.delete(cacheKey);
+    if (pendingFetches.get(cacheKey) === current)
+      pendingFetches.delete(cacheKey);
   }
 }
 

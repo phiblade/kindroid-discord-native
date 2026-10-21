@@ -1,3 +1,7 @@
+# Native bridge development
+
+Milestone 2 adds [home-room ingestion and reconnect recovery](docs/milestone-2.md). Run `npm run ingest:native` for intake only; native Kindroid delivery is still pending. `npm start` below remains the inherited runtime. Prettier runs on staged files before every commit via the installed Git hook.
+
 # Kindroid Discord Native
 
 This repository is the starting point for a durable Discord home-room bridge to Kindroid's native API. Milestone 1 now provides SQLite storage and a delivery loop with fake APIs and tests. The live entry point and setup instructions below still describe the inherited Discord-endpoint connector.
@@ -78,6 +82,7 @@ Use environment variables to configure your bots. The .env.example file shows us
 History is cached in memory separately for each bot and channel. The first request fetches pages of up to `DISCORD_FETCH_BATCH` messages until the context is full or history runs out. Every later request fetches the latest messages and pages backward in batches of up to 10 (capped by `DISCORD_FETCH_BATCH`) until it finds cached messages, reaches the start of history, or gathers a full new context. New messages are merged by Discord message ID, the cache is trimmed to the newest 1,000 messages when it grows beyond that size, and Kindroid receives only the newest `KINDROID_MESSAGE_CONTEXT` messages, oldest-first. Short channels are checked for new messages without repeatedly loading their entire history. Caches refill after a restart. Edits to fetched messages are refreshed; older edits and deletions are not reconciled by this incremental algorithm.
 
 On Railway, set `KINDROID_MESSAGE_CONTEXT=200` and `DISCORD_FETCH_BATCH=100` in the service variables; the local `.env` is ignored by Git.
+
 - SHARED_AI_CODE_n: The share code to identify which AI persona to use for the n-th bot
 - BOT_TOKEN_n: Discord bot token for the n-th bot
 - ENABLE_FILTER_n: (Optional) true or false to enable NSFW filtering for the n-th bot

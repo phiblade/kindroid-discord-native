@@ -23,6 +23,8 @@ Review the simulated lifecycle before connecting live services.
 
 ## Milestone 2 Discord ingestion
 
+Status: implemented with a live intake-only command and fake-delivery integration tests; see [the runbook](milestone-2.md). Live service verification remains part of the controlled trial.
+
 Connect the home-room event handler and recovery pagination. Persist every eligible message, deduplicate overlapping gateway/history events, and keep the boundary and cursor crash-safe. Observe edits/deletions without silently rewriting attempted batches. Resolve their post-delivery policy before enabling correction delivery.
 
 Test restart after missed messages, multiple pages of backlog, events during backfill, bot-authored messages, and gateway events arriving before posting acknowledgments. A recovered gap must not reorder outbound history.

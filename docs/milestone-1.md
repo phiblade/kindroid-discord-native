@@ -18,30 +18,30 @@ The simulator ignores real API credentials. It creates a temporary database, sav
 
 ## Modules
 
-| Module | Responsibility |
-| --- | --- |
-| `src/native/config.ts` | Validate native identity, batch budget and retry settings |
-| `src/native/types.ts` | Transport contracts, states and explicit rejection errors |
-| `src/native/store.ts` | Schema migration, transactions, immutable batches, chunks, receipts and retention |
-| `src/native/batching.ts` | Fit the complete batch into its character budget and split replies safely |
-| `src/native/delivery.ts` | One asynchronous delivery loop per kin, wakeups, retries and reconciliation |
-| `src/native/fakes.ts` | Controllable clock and fake remote acceptance/history |
-| `src/native/simulate.ts` | Executable demonstration without live APIs |
+| Module                   | Responsibility                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `src/native/config.ts`   | Validate native identity, batch budget and retry settings                         |
+| `src/native/types.ts`    | Transport contracts, states and explicit rejection errors                         |
+| `src/native/store.ts`    | Schema migration, transactions, immutable batches, chunks, receipts and retention |
+| `src/native/batching.ts` | Fit the complete batch into its character budget and split replies safely         |
+| `src/native/delivery.ts` | One asynchronous delivery loop per kin, wakeups, retries and reconciliation       |
+| `src/native/fakes.ts`    | Controllable clock and fake remote acceptance/history                             |
+| `src/native/simulate.ts` | Executable demonstration without live APIs                                        |
 
 ## Native configuration
 
 These settings are consumed by `loadNativeConfig`, not by the inherited live entry point. No tokens are needed by the core or simulator.
 
-| Variable | Meaning | Default |
-| --- | --- | --- |
-| `BRIDGE_ID` | Stable local bridge identity | `default` |
-| `DISCORD_BOT_ID` | Own bot author ID, to prevent feedback | Required |
-| `DISCORD_HOME_CHANNEL_ID` | Only channel whose messages are accepted | Required |
-| `KINDROID_AI_ID` | Dedicated native kin identity | Required |
-| `KINDROID_MESSAGE_MAX_CHARS` | Complete batch budget in UTF-16 code units | `4000` |
-| `RETRY_BASE_MS` | Initial retry/reconciliation delay | `2000` |
-| `RETRY_MAX_MS` | Maximum exponential delay | `60000` |
-| `MAX_RECONCILE_CHECKS` | Unknown-outcome checks before blocking | `5` |
+| Variable                     | Meaning                                    | Default   |
+| ---------------------------- | ------------------------------------------ | --------- |
+| `BRIDGE_ID`                  | Stable local bridge identity               | `default` |
+| `DISCORD_BOT_ID`             | Own bot author ID, to prevent feedback     | Required  |
+| `DISCORD_HOME_CHANNEL_ID`    | Only channel whose messages are accepted   | Required  |
+| `KINDROID_AI_ID`             | Dedicated native kin identity              | Required  |
+| `KINDROID_MESSAGE_MAX_CHARS` | Complete batch budget in UTF-16 code units | `4000`    |
+| `RETRY_BASE_MS`              | Initial retry/reconciliation delay         | `2000`    |
+| `RETRY_MAX_MS`               | Maximum exponential delay                  | `60000`   |
+| `MAX_RECONCILE_CHECKS`       | Unknown-outcome checks before blocking     | `5`       |
 
 The batch budget is validated from 256 to 100,000 for testing and future tuning; this is a local configuration range, not a statement of the API's accepted size. The native API limit still needs verification. An envelope or speaker label too large to fit even one character halts delivery visibly and preserves the pending text.
 

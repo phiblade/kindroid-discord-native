@@ -1,6 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { ephemeralFetchConversation: fetchHistory } = require('../dist/messageFetch');
+const {
+  ephemeralFetchConversation: fetchHistory,
+} = require('../dist/messageFetch');
 process.env.CONTENT_PREPEND_SPEAKER = 'no';
 let channelId = 0;
 function fixture(count, botId = 'bot') {
@@ -8,31 +10,58 @@ function fixture(count, botId = 'bot') {
   let history = [];
   let failOn;
   const channel = {
-    id: String(++channelId), client: { user: { id: botId } },
-    messages: { fetch: async (options) => {
-      calls.push(options);
-      if (calls.length === failOn) throw new Error('fetch failed');
-      const page = history.filter(m => !options.before || BigInt(m.id) < BigInt(options.before))
-        .sort((a, b) => Number(BigInt(b.id) - BigInt(a.id))).slice(0, options.limit);
-      return new Map(page.map(m => [m.id, m]));
-    } },
+    id: String(++channelId),
+    client: { user: { id: botId } },
+    messages: {
+      fetch: async (options) => {
+        calls.push(options);
+        if (calls.length === failOn) throw new Error('fetch failed');
+        const page = history
+          .filter(
+            (m) => !options.before || BigInt(m.id) < BigInt(options.before),
+          )
+          .sort((a, b) => Number(BigInt(b.id) - BigInt(a.id)))
+          .slice(0, options.limit);
+        return new Map(page.map((m) => [m.id, m]));
+      },
+    },
   };
   const append = (n) => {
     const start = history.length;
-    for (let i = start + 1; i <= start + n; i++) history.push({
-      id: String(i), author: { id: 'bot', username: 'Other bot' },
-      content: String(i), createdAt: new Date(i), createdTimestamp: i,
-    });
+    for (let i = start + 1; i <= start + n; i++)
+      history.push({
+        id: String(i),
+        author: { id: 'bot', username: 'Other bot' },
+        content: String(i),
+        createdAt: new Date(i),
+        createdTimestamp: i,
+      });
   };
   append(count);
-  return { channel, calls, append, failAt: n => { failOn = n; } };
+  return {
+    channel,
+    calls,
+    append,
+    failAt: (n) => {
+      failOn = n;
+    },
+  };
 }
-const texts = messages => messages.map(m => Number(m.text));
+const texts = (messages) => messages.map((m) => Number(m.text));
 
 test('fills 200 using two pages, keeps chronological order, then checks just 10', async () => {
   const f = fixture(250);
-  assert.deepEqual(texts(await fetchHistory(f.channel, 200)), Array.from({length: 200}, (_, i) => i + 51));
-  assert.deepEqual(f.calls.map(c => [c.limit, c.before]), [[100, undefined], [100, '151']]);
+  assert.deepEqual(
+    texts(await fetchHistory(f.channel, 200)),
+    Array.from({ length: 200 }, (_, i) => i + 51),
+  );
+  assert.deepEqual(
+    f.calls.map((c) => [c.limit, c.before]),
+    [
+      [100, undefined],
+      [100, '151'],
+    ],
+  );
   assert.equal((await fetchHistory(f.channel, 200)).length, 200);
   assert.equal(f.calls.length, 3);
   assert.equal(f.calls[2].limit, 10);
@@ -54,7 +83,14 @@ test('pages through multiple all-new batches until overlap', async () => {
   await fetchHistory(f.channel, 200);
   f.append(25);
   const result = texts(await fetchHistory(f.channel, 200));
-  assert.deepEqual(f.calls.slice(2).map(c => [c.limit, c.before]), [[10, undefined], [10, '216'], [10, '206']]);
+  assert.deepEqual(
+    f.calls.slice(2).map((c) => [c.limit, c.before]),
+    [
+      [10, undefined],
+      [10, '216'],
+      [10, '206'],
+    ],
+  );
   assert.equal(result[0], 26);
   assert.equal(result.at(-1), 225);
 });
@@ -85,10 +121,13 @@ test('supports bounds, rejects invalid sizes, and refills after context change',
   for (const size of [1, 1000]) {
     const f = fixture(1100);
     assert.equal((await fetchHistory(f.channel, size)).length, size);
-    assert.ok(f.calls.every(c => c.limit <= 100));
+    assert.ok(f.calls.every((c) => c.limit <= 100));
   }
   for (const size of [0, 1001, 1.5, NaN]) {
-    await assert.rejects(fetchHistory(fixture(1).channel, size), /KINDROID_MESSAGE_CONTEXT/);
+    await assert.rejects(
+      fetchHistory(fixture(1).channel, size),
+      /KINDROID_MESSAGE_CONTEXT/,
+    );
   }
   const f = fixture(250);
   await fetchHistory(f.channel, 10);
@@ -102,32 +141,53 @@ test('failed incremental pages do not partially commit; retry catches all new me
   f.failAt(4);
   await assert.rejects(fetchHistory(f.channel, 200), /fetch failed/);
   const result = texts(await fetchHistory(f.channel, 200));
-  assert.deepEqual(result, Array.from({length: 200}, (_, i) => i + 26));
+  assert.deepEqual(
+    result,
+    Array.from({ length: 200 }, (_, i) => i + 26),
+  );
 });
 
 test('serializes concurrent requests and isolates bots sharing a channel', async () => {
   const f = fixture(200);
-  const results = await Promise.all([fetchHistory(f.channel, 200), fetchHistory(f.channel, 200)]);
+  const results = await Promise.all([
+    fetchHistory(f.channel, 200),
+    fetchHistory(f.channel, 200),
+  ]);
   assert.deepEqual(results[0], results[1]);
-  assert.deepEqual(f.calls.map(c => c.limit), [100, 100, 10]);
+  assert.deepEqual(
+    f.calls.map((c) => c.limit),
+    [100, 100, 10],
+  );
   const other = fixture(200, 'other');
   other.channel.id = f.channel.id;
   const otherResult = await fetchHistory(other.channel, 200);
   assert.equal(results[0][0].username, '{{ai}}');
   assert.equal(otherResult[0].username, 'Other bot');
-  assert.deepEqual(other.calls.map(c => c.limit), [100, 100]);
+  assert.deepEqual(
+    other.calls.map((c) => c.limit),
+    [100, 100],
+  );
 });
 
 test('configurable Discord batch controls initial pages and caps incremental pages', async () => {
   const f = fixture(25);
   await fetchHistory(f.channel, 20, 7);
-  assert.deepEqual(f.calls.map(c => c.limit), [7, 7, 6]);
+  assert.deepEqual(
+    f.calls.map((c) => c.limit),
+    [7, 7, 6],
+  );
   f.append(8);
   const result = await fetchHistory(f.channel, 20, 7);
-  assert.deepEqual(f.calls.slice(3).map(c => c.limit), [7, 7]);
+  assert.deepEqual(
+    f.calls.slice(3).map((c) => c.limit),
+    [7, 7],
+  );
   assert.equal(result.at(-1).text, '33');
   for (const batch of [0, 101, 1.5, NaN]) {
-    await assert.rejects(fetchHistory(f.channel, 20, batch), /DISCORD_FETCH_BATCH/);
+    await assert.rejects(
+      fetchHistory(f.channel, 20, batch),
+      /DISCORD_FETCH_BATCH/,
+    );
   }
 });
 
@@ -138,9 +198,15 @@ test('cache grows beyond payload size but retains only the newest 1000 messages'
   const { runInNewContext } = require('node:vm');
   const path = require.resolve('../dist/messageFetch');
   const isolated = { exports: {} };
-  runInNewContext(readFileSync(path, 'utf8') + '\nexports.cacheForTest = channelCache;', {
-    exports: isolated.exports, require: createRequire(path), console, process,
-  });
+  runInNewContext(
+    readFileSync(path, 'utf8') + '\nexports.cacheForTest = channelCache;',
+    {
+      exports: isolated.exports,
+      require: createRequire(path),
+      console,
+      process,
+    },
+  );
   const { ephemeralFetchConversation: fetch, cacheForTest } = isolated.exports;
   const f = fixture(200);
   await fetch(f.channel, 200);
