@@ -578,7 +578,6 @@ export class BridgeStore {
         config.channelId,
         pending,
         config.maxChars,
-        now,
         this.presentation.get(id) ?? defaultPresentation,
         this.roomLabels.get(id),
       );

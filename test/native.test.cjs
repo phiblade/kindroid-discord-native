@@ -210,7 +210,7 @@ test('catch-up substantive replies are posted, exact controls suppressed, no emp
   loop.start();
   await loop.settled();
   assert.equal(f.kin.calls.length, 4);
-  assert.match(f.kin.calls[0].payload, /\| 3\n/);
+  assert.match(f.kin.calls[0].payload, /\n\n3$/);
   assert.deepEqual(
     f.discord.posts.map((p) => p.content),
     [replies[0], 'None.'],
@@ -768,10 +768,11 @@ test('compact transcript compresses repeated newlines and hides optional metadat
     }),
   );
   const batch = f.store.prepare('bridge', Date.UTC(2026, 9, 22, 10));
-  assert.ok(batch.payload.startsWith('2026-10-22T10:00:00Z\n'));
+  assert.ok(batch.payload.startsWith(batch.id + '\n'));
   assert.ok(
     batch.payload.includes(
-      '700 Bob* Smith\n\n09:42 **Bob\\* Smith**\n' + text.replace(/\n+/g, '\n'),
+      '700 Bob* Smith\n\n10/21 09:42 **Bob\\* Smith**\n' +
+        text.replace(/\n+/g, '\n'),
     ),
   );
   assert.ok(!batch.payload.includes('message:'));
@@ -806,8 +807,6 @@ test('presentation changes affect new batches only and do not require a configur
   f.store.finishBatch(prepared, { text: 'none.' });
   f.store.ingest('bridge', message(2, 'second'));
   const next = f.store.prepare('bridge', 3000);
-  assert.ok(
-    next.payload.startsWith('1970-01-01T00:00:03Z\n#actual-room | 800\n'),
-  );
-  assert.ok(next.payload.includes('\n\n00:00 **Alice**\nsecond'));
+  assert.ok(next.payload.startsWith(next.id + '\n#actual-room | 800\n'));
+  assert.ok(next.payload.includes('\n\n01/01 00:00 **Alice**\nsecond'));
 });

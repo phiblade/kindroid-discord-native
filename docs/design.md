@@ -22,20 +22,20 @@ Standing protocol instructions belong in the kin's personality configuration, in
 Batch envelope (compact positional transcript, default switches):
 
 ```text
-2026-10-22T09:42:15Z
-9c78273d-48e1-4e84-b7fd-4f0a92b51366 | 0
-
+9c78273d-48e1-4e84-b7fd-4f0a92b51366
 234567890123456789 Bob
 345678901234567890 Phil
 
-09:41 **Bob**
+10/21 09:41 **Bob**
 Hey, how's everyone doing?
 
-09:42 **Phil**
+10/21 09:42 **Phil**
 Pretty good. What do you think, Kin?
+
+0
 ```
 
-The preparation timestamp and batch ID/count are always present. Room name/ID, message ID, date, and time are individually configurable; only message time defaults on. The speaker list is separated from the metadata and messages by blank lines. Each line starts with a numeric author ID and a space, followed by the entire display name. Embedded newlines are normalized to spaces; other characters are preserved without added quoting or escaping. Delivered body text is unquoted, with runs of CR/LF line breaks collapsed to one LF; original text remains in SQLite. See [the current protocol and switches](milestone-3.md#compact-transcript-format).
+The batch ID is the first line and the remaining-message count is the final line. Room name/ID, message ID, date, and time are individually configurable; message date and time default on. The speaker list belongs to the header, directly after the batch ID and optional room line. A double newline separates the header from the message list and the message list from the final count. Each line starts with a numeric author ID and a space, followed by the entire display name. Embedded newlines are normalized to spaces; other characters are preserved without added quoting or escaping. Delivered body text is unquoted, with runs of CR/LF line breaks collapsed to one LF; original text remains in SQLite. See [the current protocol and switches](milestone-3.md#compact-transcript-format).
 
 The remaining count is a snapshot when the batch is assembled. More messages can arrive during generation. `more.` does not cause an empty request; the delivery loop follows the durable pending queue. `none.` still counts as a successful exchange. API errors and empty responses are operational outcomes, not public speech.
 

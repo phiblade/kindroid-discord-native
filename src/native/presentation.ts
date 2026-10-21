@@ -7,7 +7,7 @@ export interface Presentation {
 }
 export const defaultPresentation: Presentation = {
   messageId: false,
-  date: false,
+  date: true,
   time: true,
   roomLabel: false,
   roomId: false,

@@ -20,12 +20,12 @@ const message = (extra = {}) => ({
   ...extra,
 });
 const batch = (messages, options = defaultPresentation, max = 4000) =>
-  assembleBatch('batch-uuid', '800', messages, max, now, options, 'general');
+  assembleBatch('batch-uuid', '800', messages, max, options, 'general');
 
 test('default compact payload has positional metadata, line-based mapping and compacted body text', () => {
   assert.equal(
     batch([message()]).payload,
-    '2026-10-22T09:42:15Z\nbatch-uuid | 0\n\n700 Bob\n\n09:41 **Bob**\nHi!\nHow are you?',
+    'batch-uuid\n700 Bob\n\n10/21 09:41 **Bob**\nHi!\nHow are you?\n\n0',
   );
 });
 
@@ -44,9 +44,7 @@ test('all 32 combinations independently control optional metadata in the agreed 
       .join(' | ');
     assert.equal(
       result.split('\n\n')[0],
-      ['2026-10-22T09:42:15Z', ...(room ? [room] : []), 'batch-uuid | 0'].join(
-        '\n',
-      ),
+      ['batch-uuid', ...(room ? [room] : []), '700 Bob'].join('\n'),
     );
     const heading = [
       options.messageId ? '123' : '',
@@ -73,7 +71,7 @@ test('speaker names preserve spaces and symbols verbatim while normalizing newli
   );
   const result = batch(messages).payload;
   assert.equal(
-    result.split('\n\n')[1],
+    result.split('\n\n')[0].split('\n').slice(1).join('\n'),
     names.map((name, i) => `${700 + i} ${name.replace('\n', ' ')}`).join('\n'),
   );
 });
@@ -84,7 +82,10 @@ test('speaker mapping deduplicates names and disambiguates different authors wit
     message({ id: '124' }),
     message({ id: '125', author_id: '701' }),
   ]).payload;
-  assert.equal(result.split('\n\n')[1], '700 Bob (700)\n701 Bob (701)');
+  assert.equal(
+    result.split('\n\n')[0].split('\n').slice(1).join('\n'),
+    '700 Bob (700)\n701 Bob (701)',
+  );
   assert.equal(result.split('**Bob \\(700\\)**').length - 1, 2);
 });
 
@@ -145,7 +146,7 @@ test('body newline compaction handles CRLF and CR without changing section separ
   const result = batch([source, message({ id: '124', content: 'next' })]);
   assert.ok(
     result.payload.endsWith(
-      '09:41 **Bob**\none\ntwo\nthree\nfour\n\n09:41 **Bob**\nnext',
+      '10/21 09:41 **Bob**\none\ntwo\nthree\nfour\n\n10/21 09:41 **Bob**\nnext\n\n0',
     ),
   );
   assert.equal(source.content, 'one\r\n\r\ntwo\r\rthree\n\nfour');
@@ -156,7 +157,7 @@ test('fragment ranges preserve source offsets while collapsing a newline run acr
   const content = 'hello\r\n\r\nworld';
   const source = message({ content, offset: 6 }); // earlier saved fragment ended after CR
   const result = batch([source]);
-  assert.ok(result.payload.endsWith('[6|end]\nworld'));
+  assert.ok(result.payload.endsWith('[6|end]\nworld\n\n0'));
   assert.equal(result.members[0].start, 6);
   assert.equal(result.members[0].end, content.length);
 });

@@ -37,7 +37,6 @@ export function assembleBatch(
   channel: string,
   pending: StoredMessage[],
   maxChars: number,
-  now = Date.now(),
   options: Presentation = defaultPresentation,
   roomLabel?: string,
 ): { payload: string; members: BatchMember[] } {
@@ -75,12 +74,10 @@ export function assembleBatch(
     .filter(Boolean)
     .join(' | ');
   let completed = 0;
-  const header = (remaining: number, mapping: Map<string, string>) =>
+  const header = (mapping: Map<string, string>) =>
     [
-      iso(now),
+      id,
       ...(room ? [room] : []),
-      `${id} | ${remaining}`,
-      '',
       [...mapping].map(([name, author]) => `${author} ${name}`).join('\n'),
     ].join('\n') + '\n\n';
   for (const message of pending) {
@@ -104,7 +101,9 @@ export function assembleBatch(
       return `${heading}${edit}${fragment}\n${compactBody(message.content, message.offset, end)}`;
     };
     const payload = (end: number, remaining: number) =>
-      header(remaining, mapping) + [...lines, lineFor(end)].join('\n\n');
+      header(mapping) +
+      [...lines, lineFor(end)].join('\n\n') +
+      `\n\n${remaining}`;
     let end = message.content.length;
     if (payload(end, pending.length - completed - 1).length > maxChars) {
       if (members.length) break;
@@ -138,7 +137,7 @@ export function assembleBatch(
   }
   if (!members.length) throw new Error('Cannot assemble an empty batch');
   const result =
-    header(pending.length - completed, speakers) + lines.join('\n\n');
+    header(speakers) + lines.join('\n\n') + `\n\n${pending.length - completed}`;
   if (result.length > maxChars)
     throw new Error('Batch exceeded configured budget');
   return { payload: result, members };
