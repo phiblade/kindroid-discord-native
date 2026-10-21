@@ -32,6 +32,13 @@ function fixture(t) {
   const path = join(dir, 'db.sqlite');
   let store = new BridgeStore(path);
   store.register(cfg);
+  store.configurePresentation(cfg.id, {
+    messageId: true,
+    date: false,
+    time: true,
+    roomLabel: false,
+    roomId: false,
+  });
   t.after(() => {
     store.close();
     rmSync(dir, { recursive: true, force: true });
@@ -45,6 +52,13 @@ function fixture(t) {
       store.close();
       store = new BridgeStore(path, fault);
       store.register(cfg);
+      store.configurePresentation(cfg.id, {
+        messageId: true,
+        date: false,
+        time: true,
+        roomLabel: false,
+        roomId: false,
+      });
     },
   };
 }

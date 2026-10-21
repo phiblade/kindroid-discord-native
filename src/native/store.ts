@@ -1,3 +1,4 @@
+import { Presentation, defaultPresentation } from './presentation';
 import { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -19,6 +20,14 @@ const openStores = new Set<string>();
 export class BridgeStore {
   private db: DatabaseSync;
   private readonly key: string;
+  private readonly presentation = new Map<string, Presentation>();
+  private readonly roomLabels = new Map<string, string>();
+  configurePresentation(id: string, options: Presentation): void {
+    this.presentation.set(id, { ...options });
+  }
+  setRoomLabel(id: string, label: string): void {
+    this.roomLabels.set(id, label);
+  }
   private readonly workers = new Set<string>();
   constructor(
     path: string,
@@ -569,6 +578,9 @@ export class BridgeStore {
         config.channelId,
         pending,
         config.maxChars,
+        now,
+        this.presentation.get(id) ?? defaultPresentation,
+        this.roomLabels.get(id),
       );
       this.run(
         "INSERT INTO batches(id,bridge_id,payload,state,created_at) VALUES(?,?,?,'prepared',?)",

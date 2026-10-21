@@ -1,3 +1,4 @@
+import { Presentation, defaultPresentation } from './presentation';
 import { BatchMember, StoredMessage } from './types';
 
 /** Do not cut between the two UTF-16 units of a non-BMP character. */
@@ -12,17 +13,14 @@ function safeEnd(text: string, end: number): number {
   return end;
 }
 
-/** Keep display names on one line and prevent them from creating Markdown structure. */
-function speakerLabel(name: string): string {
-  return name
-    .replace(/[\r\n\u2028\u2029]+/g, ' ')
-    .replace(/([\\`*_{}[\]()<>#+.!|~-])/g, '\\$1');
+function nameLine(name: string): string {
+  return name.replace(/[\r\n\u2028\u2029]+/g, ' ');
 }
-
-function utc(timestamp: number): string {
-  return (
-    new Date(timestamp).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
-  );
+function markdown(name: string): string {
+  return name.replace(/([\\`*_{}[\]()<>#+.!|~-])/g, '\\$1');
+}
+function iso(timestamp: number): string {
+  return new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 export function assembleBatch(
@@ -30,44 +28,86 @@ export function assembleBatch(
   channel: string,
   pending: StoredMessage[],
   maxChars: number,
+  now = Date.now(),
+  options: Presentation = defaultPresentation,
+  roomLabel?: string,
 ): { payload: string; members: BatchMember[] } {
+  if (options.roomLabel && !roomLabel)
+    throw new Error('Discord room label is not available yet');
   const lines: string[] = [];
   const members: BatchMember[] = [];
+  const speakers = new Map<string, string>();
+  const keyFor = (m: StoredMessage) =>
+    JSON.stringify([nameLine(m.speaker), m.author_id]);
+  const owners = new Map<string, Set<string>>();
+  for (const m of pending) {
+    const name = nameLine(m.speaker);
+    if (!owners.has(name)) owners.set(name, new Set());
+    owners.get(name)!.add(m.author_id);
+  }
+  const labels = new Map<string, string>();
+  const reserved = new Set(owners.keys());
+  for (const m of pending) {
+    const key = keyFor(m),
+      name = nameLine(m.speaker);
+    if (labels.has(key)) continue;
+    let label = name;
+    if (owners.get(name)!.size > 1) {
+      label = `${name} (${m.author_id})`;
+      while (reserved.has(label)) label += '_';
+      reserved.add(label);
+    }
+    labels.set(key, label);
+  }
+  const room = [
+    options.roomLabel ? `#${nameLine(roomLabel!)}` : '',
+    options.roomId ? channel : '',
+  ]
+    .filter(Boolean)
+    .join(' | ');
   let completed = 0;
-  const header = (remaining: number) =>
-    `Latest from the home room (channel: ${channel})\nBatch: ${id}\nMessages remaining after this batch: ${remaining}\n\n`;
-  const payload = (line: string, remaining: number) =>
-    header(remaining) + [...lines, line].join('\n\n');
+  const header = (remaining: number, mapping: Map<string, string>) =>
+    [
+      iso(now),
+      ...(room ? [room] : []),
+      `${id} | ${remaining}`,
+      [...mapping]
+        .map(([name, author]) => `${JSON.stringify(name)}=${author}`)
+        .join('; '),
+    ].join('\n') + '\n\n';
   for (const message of pending) {
+    const label = labels.get(keyFor(message))!;
+    const mapping = new Map(speakers).set(label, message.author_id);
+    const stamp = iso(message.timestamp);
+    const heading = [
+      options.messageId ? message.id : '',
+      options.date ? `${stamp.slice(5, 7)}/${stamp.slice(8, 10)}` : '',
+      options.time ? stamp.slice(11, 16) : '',
+      `**${markdown(label)}**`,
+    ]
+      .filter(Boolean)
+      .join(' ');
     const lineFor = (end: number) => {
-      const details = [
-        `message: ${message.id}`,
-        `author: ${message.author_id}`,
-      ];
-      if (message.version) details.push(`edited: ${utc(message.version)}`);
-      if (message.offset || end < message.content.length)
-        details.push(`offset: ${message.offset}`);
-      if (end < message.content.length) details.push('continues in next batch');
-      else if (message.offset) details.push('final fragment');
-      // Quote every source line, including blank ones, so text stays inside its message.
-      const text = message.content
-        .slice(message.offset, end)
-        .split('\n')
-        .map((line) => `> ${line}`)
-        .join('\n');
-      return `**${speakerLabel(message.speaker)}** · ${utc(message.timestamp)}\n(${details.join(' · ')})\n${text}`;
+      const edit = message.version ? ` [~${iso(message.version)}]` : '';
+      const fragment =
+        message.offset || end < message.content.length
+          ? ` [${message.offset}|${end < message.content.length ? 'more' : 'end'}]`
+          : '';
+      return `${heading}${edit}${fragment}\n${message.content.slice(message.offset, end)}`;
     };
+    const payload = (end: number, remaining: number) =>
+      header(remaining, mapping) + [...lines, lineFor(end)].join('\n\n');
     let end = message.content.length;
-    if (
-      payload(lineFor(end), pending.length - completed - 1).length > maxChars
-    ) {
-      if (members.length) break; // Keep whole messages together whenever possible.
-      let lo = message.offset;
-      let hi = message.content.length;
+    if (payload(end, pending.length - completed - 1).length > maxChars) {
+      if (members.length) break;
+      let lo = message.offset,
+        hi = message.content.length;
       while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2);
-        const candidate = safeEnd(message.content, mid);
-        if (payload(lineFor(candidate), pending.length).length <= maxChars)
+        if (
+          payload(safeEnd(message.content, mid), pending.length).length <=
+          maxChars
+        )
           lo = mid;
         else hi = mid - 1;
       }
@@ -78,6 +118,7 @@ export function assembleBatch(
         );
     }
     lines.push(lineFor(end));
+    speakers.set(label, message.author_id);
     members.push({
       messageId: message.id,
       version: message.version,
@@ -88,7 +129,8 @@ export function assembleBatch(
     else break;
   }
   if (!members.length) throw new Error('Cannot assemble an empty batch');
-  const result = header(pending.length - completed) + lines.join('\n\n');
+  const result =
+    header(pending.length - completed, speakers) + lines.join('\n\n');
   if (result.length > maxChars)
     throw new Error('Batch exceeded configured budget');
   return { payload: result, members };

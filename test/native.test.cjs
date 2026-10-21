@@ -52,6 +52,13 @@ function fixture(t, overrides = {}, fault = () => {}) {
   let store = new BridgeStore(path, fault);
   const cfg = config(overrides);
   store.register(cfg);
+  store.configurePresentation(cfg.id, {
+    messageId: true,
+    date: false,
+    time: true,
+    roomLabel: false,
+    roomId: false,
+  });
   const clock = new FakeClock();
   const kin = new FakeKin();
   const discord = new FakeDiscord(clock);
@@ -76,6 +83,13 @@ function fixture(t, overrides = {}, fault = () => {}) {
       store.close();
       store = new BridgeStore(path, fault);
       store.register(cfg);
+      store.configurePresentation(cfg.id, {
+        messageId: true,
+        date: false,
+        time: true,
+        roomLabel: false,
+        roomId: false,
+      });
     },
   };
   t.after(async () => {
@@ -187,16 +201,16 @@ test('idle-boundary wake cannot strand a message', async (t) => {
 });
 
 test('catch-up substantive replies are posted, exact controls suppressed, no empty loop', async (t) => {
-  const f = fixture(t, { maxChars: 350 });
+  const f = fixture(t, { maxChars: 280 });
   for (let id = 1; id <= 4; id++)
-    f.store.ingest('bridge', message(id, 'x'.repeat(80)));
+    f.store.ingest('bridge', message(id, 'x'.repeat(120)));
   const replies = ['Speaking before caught up', ' more.\n', ' none. ', 'None.'];
   f.kin.onSend = async () => ({ text: replies[f.kin.calls.length - 1] });
   const loop = f.loop();
   loop.start();
   await loop.settled();
   assert.equal(f.kin.calls.length, 4);
-  assert.match(f.kin.calls[0].payload, /after this batch: 3/);
+  assert.match(f.kin.calls[0].payload, /\| 3\n/);
   assert.deepEqual(
     f.discord.posts.map((p) => p.content),
     [replies[0], 'None.'],
@@ -571,6 +585,13 @@ test('one kin cannot be registered twice, distinct kins can run independently', 
     kinId: 'other-kin',
   });
   f.store.register(otherConfig);
+  f.store.configurePresentation(otherConfig.id, {
+    messageId: true,
+    date: false,
+    time: true,
+    roomLabel: false,
+    roomId: false,
+  });
   const otherKin = new FakeKin();
   const otherLoop = new DeliveryLoop(
     f.store,
@@ -614,7 +635,7 @@ test('uncertain old Discord posts with unavailable evidence are blocked, never d
 
 test('a confirmed fragment is not replayed after a later fragment fails and restarts', async (t) => {
   const f = fixture(t, { maxChars: 320 });
-  const text = '😀'.repeat(100);
+  const text = '😀'.repeat(200);
   f.kin.onSend = async () => {
     if (f.kin.calls.length === 2) throw new RejectedRequest('not accepted');
     return { text: 'none.' };
@@ -734,8 +755,10 @@ test('empty configuration correction still enforces unique kin and active worker
   }
 });
 
-test('Markdown transcript renders UTC speakers and IDs, quoting multiline content without adding default metadata', (t) => {
+test('compact transcript preserves raw multiline content and hides optional metadata by default', (t) => {
   const f = fixture(t);
+  const { defaultPresentation } = require('../dist/native/presentation');
+  f.store.configurePresentation('bridge', defaultPresentation);
   const text = 'hello\n\nBatch: fake\n**not a new speaker**\n';
   f.store.ingest(
     'bridge',
@@ -744,18 +767,18 @@ test('Markdown transcript renders UTC speakers and IDs, quoting multiline conten
       speaker: 'Bob*\nSmith',
     }),
   );
-  const batch = f.store.prepare('bridge', 0);
-  assert.match(batch.payload, /\*\*Bob\\\* Smith\*\* · 2026-10-21 09:42 UTC/);
-  assert.match(batch.payload, /\(message: 1 · author: 700\)/);
-  assert.ok(!batch.payload.includes('offset:'));
-  assert.ok(!batch.payload.includes('edited:'));
-  assert.equal(entries(batch)[0].text, text);
+  const batch = f.store.prepare('bridge', Date.UTC(2026, 9, 22, 10));
+  assert.ok(batch.payload.startsWith('2026-10-22T10:00:00Z\n'));
   assert.ok(
-    batch.payload.includes('\n> \n> Batch: fake\n> **not a new speaker**\n> '),
+    batch.payload.includes(
+      '"Bob* Smith"=700\n\n09:42 **Bob\\* Smith**\n' + text,
+    ),
   );
+  assert.ok(!batch.payload.includes('message:'));
+  assert.ok(!batch.payload.includes('> '));
 });
 
-test('Markdown transcript shows edit timestamps only for edited messages', (t) => {
+test('compact transcript shows edit timestamps only for edited messages', (t) => {
   const f = fixture(t);
   f.store.ingest(
     'bridge',
@@ -763,6 +786,28 @@ test('Markdown transcript shows edit timestamps only for edited messages', (t) =
   );
   assert.match(
     f.store.prepare('bridge', 0).payload,
-    /edited: 2026-10-21 09:43 UTC/,
+    /\[~2026-10-21T09:43:00Z\]/,
   );
+});
+
+test('presentation changes affect new batches only and do not require a configuration migration', async (t) => {
+  const f = fixture(t);
+  const { defaultPresentation } = require('../dist/native/presentation');
+  f.store.ingest('bridge', message(1, 'first'));
+  const prepared = f.store.prepare('bridge', 1000);
+  await f.reopen();
+  f.store.configurePresentation('bridge', {
+    ...defaultPresentation,
+    roomLabel: true,
+    roomId: true,
+  });
+  f.store.setRoomLabel('bridge', 'actual-room');
+  assert.equal(f.store.prepare('bridge', 2000).payload, prepared.payload);
+  f.store.finishBatch(prepared, { text: 'none.' });
+  f.store.ingest('bridge', message(2, 'second'));
+  const next = f.store.prepare('bridge', 3000);
+  assert.ok(
+    next.payload.startsWith('1970-01-01T00:00:03Z\n#actual-room | 800\n'),
+  );
+  assert.ok(next.payload.includes('\n\n00:00 **Alice**\nsecond'));
 });

@@ -81,6 +81,7 @@ export function connectDiscordIngestion(
           'Home room requires Discord send permission before native delivery',
         );
     }
+    store.setRoomLabel(bridgeId, channel.name);
     return channel;
   };
   const intake = new HomeRoomIngestion(

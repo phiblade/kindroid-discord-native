@@ -1,3 +1,4 @@
+import { loadPresentation } from './presentation';
 import 'dotenv/config';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -10,6 +11,7 @@ import { DeliveryLoop, systemClock } from './delivery';
 
 export async function runNative(): Promise<void> {
   const config = loadNativeConfig(process.env);
+  const presentation = loadPresentation(process.env);
   const token = process.env.DISCORD_BOT_TOKEN;
   const key = process.env.KINDROID_API_KEY;
   if (!token?.trim()) throw new Error('DISCORD_BOT_TOKEN is required');
@@ -26,6 +28,7 @@ export async function runNative(): Promise<void> {
   const path = process.env.BRIDGE_DATABASE_PATH ?? 'data/native.sqlite';
   mkdirSync(dirname(path), { recursive: true });
   const store = new BridgeStore(path);
+  store.configurePresentation(config.id, presentation);
   try {
     store.register(config);
   } catch (error) {

@@ -11,7 +11,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "test": "npm run build && node --test test/*.test.cjs",
-    "test:native": "npm run build && node --test test/native.test.cjs test/ingestion.test.cjs test/transports.test.cjs",
+    "test:native": "npm run build && node --test test/native.test.cjs test/ingestion.test.cjs test/transports.test.cjs test/presentation.test.cjs",
     "simulate:native": "npm run build && node dist/native/simulate.js",
     "ingest:native": "npm run build && node dist/native/ingest.js",
     "format": "prettier --write .",

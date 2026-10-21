@@ -19,25 +19,25 @@ The bridge connects one Discord bot and its home channel to one dedicated Kindro
 
 Standing protocol instructions belong in the kin's personality configuration, installed manually by the user. They explain the home room, speaker labels, remaining-message count, and control replies. The bridge never automatically overwrites the kin's personality, resets its chat, or rewinds it.
 
-Batch envelope (readable Markdown transcript):
+Batch envelope (compact positional transcript, default switches):
 
 ```text
-Latest from the home room (channel: 123456789012345678)
-Batch: 9c78273d-48e1-4e84-b7fd-4f0a92b51366
-Messages remaining after this batch: 0
+2026-10-22T09:42:15Z
+9c78273d-48e1-4e84-b7fd-4f0a92b51366 | 0
+"Bob"=234567890123456789; "Phil"=345678901234567890
 
-**Bob** · 2026-10-21 09:42 UTC
-(message: 123456789012345701 · author: 234567890123456789)
-> Hey, how's everyone doing?
+09:41 **Bob**
+Hey, how's everyone doing?
 
-**Phil** · 2026-10-21 09:43 UTC
-(message: 123456789012345702 · author: 345678901234567890)
-> Pretty good. What do you think, Kin?
+09:42 **Phil**
+Pretty good. What do you think, Kin?
 ```
+
+The preparation timestamp and batch ID/count are always present. Room name/ID, message ID, date, and time are individually configurable; only message time defaults on. Names in the speaker mapping are JSON-quoted, with embedded newlines normalized to spaces. The original body is unquoted and unchanged. See [the current protocol and switches](milestone-3.md#compact-transcript-format).
 
 The remaining count is a snapshot when the batch is assembled. More messages can arrive during generation. `more.` does not cause an empty request; the delivery loop follows the durable pending queue. `none.` still counts as a successful exchange. API errors and empty responses are operational outcomes, not public speech.
 
-The proposed batch marker supports uncertain-delivery reconciliation. Verify that native history preserves it before depending on matching. Display names are presentation labels; Discord author and message IDs remain the durable identities. Blockquote prefixes keep every source line inside its message, while speaker labels are escaped. Edit and continuation metadata appear only when relevant. Existing prepared payloads remain unchanged across format upgrades.
+The proposed batch marker supports uncertain-delivery reconciliation. Verify that native history preserves it before depending on matching. Display names are presentation labels; Discord author and message IDs remain the durable identities. Bold speaker labels escape Markdown syntax. Edit and continuation markers appear only when relevant. Participants can write text resembling headers; the bridge does not parse the transcript bodies back into records. Existing prepared payloads remain unchanged across format upgrades.
 
 ## Input budget
 
