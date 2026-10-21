@@ -117,8 +117,8 @@ test('multiple descending pages plus overlapping live events are delivered chron
     await recovery;
     await loop.settled();
     assert.deepEqual(calls, [undefined, '13', '11']);
-    const entries = kin.calls.flatMap((b) =>
-      b.payload.split('\n\n')[1].split('\n').map(JSON.parse),
+    const entries = kin.calls.flatMap(
+      require('./helpers/transcript.cjs').entries,
     );
     assert.deepEqual(
       entries.map((m) => m.id),

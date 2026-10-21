@@ -61,7 +61,7 @@ The loop is awakened by ingestion, startup, or an injected clock. Multiple wakeu
 
 ## Payloads and replies
 
-Each batch carries an ID, home-channel ID, and remaining-message count. Message entries are one JSON object per line, carrying ID, speaker, version, fragment offset, continuation flag, and text. JSON escaping keeps newlines and apparent protocol headers inside their text fields. This defines syntax, not a guarantee that a language model cannot be influenced by participant content.
+Each batch carries an ID, home-channel ID, and remaining-message count. Message entries now use a readable Markdown transcript with a bold speaker, UTC timestamp, message/author IDs, and blockquoted text. Edit and fragment metadata appear only when relevant. Every source line, including blank lines, is quoted to keep message text separate from the envelope. This defines syntax, not a guarantee that a language model cannot be influenced by participant content.
 
 Batch membership records exact source ranges. On confirmation, offsets advance atomically with the saved reply and outgoing chunks. A long source message is delivered only after all fragments complete. Confirmed fragments are not resent.
 

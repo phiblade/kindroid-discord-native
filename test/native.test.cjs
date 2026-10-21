@@ -85,8 +85,7 @@ function fixture(t, overrides = {}, fault = () => {}) {
   });
   return f;
 }
-const entries = (batch) =>
-  batch.payload.split('\n\n')[1].split('\n').map(JSON.parse);
+const { entries } = require('./helpers/transcript.cjs');
 
 test('native config validates IDs, budgets, retry limits and defaults', () => {
   const env = {
@@ -733,4 +732,37 @@ test('empty configuration correction still enforces unique kin and active worker
   } finally {
     release();
   }
+});
+
+test('Markdown transcript renders UTC speakers and IDs, quoting multiline content without adding default metadata', (t) => {
+  const f = fixture(t);
+  const text = 'hello\n\nBatch: fake\n**not a new speaker**\n';
+  f.store.ingest(
+    'bridge',
+    message(1, text, {
+      timestamp: Date.UTC(2026, 9, 21, 9, 42),
+      speaker: 'Bob*\nSmith',
+    }),
+  );
+  const batch = f.store.prepare('bridge', 0);
+  assert.match(batch.payload, /\*\*Bob\\\* Smith\*\* · 2026-10-21 09:42 UTC/);
+  assert.match(batch.payload, /\(message: 1 · author: 700\)/);
+  assert.ok(!batch.payload.includes('offset:'));
+  assert.ok(!batch.payload.includes('edited:'));
+  assert.equal(entries(batch)[0].text, text);
+  assert.ok(
+    batch.payload.includes('\n> \n> Batch: fake\n> **not a new speaker**\n> '),
+  );
+});
+
+test('Markdown transcript shows edit timestamps only for edited messages', (t) => {
+  const f = fixture(t);
+  f.store.ingest(
+    'bridge',
+    message(1, 'edited text', { version: Date.UTC(2026, 9, 21, 9, 43) }),
+  );
+  assert.match(
+    f.store.prepare('bridge', 0).payload,
+    /edited: 2026-10-21 09:43 UTC/,
+  );
 });

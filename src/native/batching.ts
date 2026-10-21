@@ -12,6 +12,19 @@ function safeEnd(text: string, end: number): number {
   return end;
 }
 
+/** Keep display names on one line and prevent them from creating Markdown structure. */
+function speakerLabel(name: string): string {
+  return name
+    .replace(/[\r\n\u2028\u2029]+/g, ' ')
+    .replace(/([\\`*_{}[\]()<>#+.!|~-])/g, '\\$1');
+}
+
+function utc(timestamp: number): string {
+  return (
+    new Date(timestamp).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+  );
+}
+
 export function assembleBatch(
   id: string,
   channel: string,
@@ -22,21 +35,28 @@ export function assembleBatch(
   const members: BatchMember[] = [];
   let completed = 0;
   const header = (remaining: number) =>
-    `Batch: ${id}\nChannel: ${JSON.stringify(channel)}\nMessages remaining after this batch: ${remaining}\n\n`;
+    `Latest from the home room (channel: ${channel})\nBatch: ${id}\nMessages remaining after this batch: ${remaining}\n\n`;
   const payload = (line: string, remaining: number) =>
-    header(remaining) + [...lines, line].join('\n');
+    header(remaining) + [...lines, line].join('\n\n');
   for (const message of pending) {
-    // JSON strings keep embedded newlines and fake envelope text inside their field.
-    const lineFor = (end: number) =>
-      JSON.stringify({
-        id: message.id,
-        speaker: message.speaker,
-        author_id: message.author_id,
-        version: message.version,
-        offset: message.offset,
-        continued: end < message.content.length,
-        text: message.content.slice(message.offset, end),
-      });
+    const lineFor = (end: number) => {
+      const details = [
+        `message: ${message.id}`,
+        `author: ${message.author_id}`,
+      ];
+      if (message.version) details.push(`edited: ${utc(message.version)}`);
+      if (message.offset || end < message.content.length)
+        details.push(`offset: ${message.offset}`);
+      if (end < message.content.length) details.push('continues in next batch');
+      else if (message.offset) details.push('final fragment');
+      // Quote every source line, including blank ones, so text stays inside its message.
+      const text = message.content
+        .slice(message.offset, end)
+        .split('\n')
+        .map((line) => `> ${line}`)
+        .join('\n');
+      return `**${speakerLabel(message.speaker)}** · ${utc(message.timestamp)}\n(${details.join(' · ')})\n${text}`;
+    };
     let end = message.content.length;
     if (
       payload(lineFor(end), pending.length - completed - 1).length > maxChars
@@ -68,7 +88,7 @@ export function assembleBatch(
     else break;
   }
   if (!members.length) throw new Error('Cannot assemble an empty batch');
-  const result = header(pending.length - completed) + lines.join('\n');
+  const result = header(pending.length - completed) + lines.join('\n\n');
   if (result.length > maxChars)
     throw new Error('Batch exceeded configured budget');
   return { payload: result, members };
