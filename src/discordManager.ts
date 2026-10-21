@@ -118,7 +118,8 @@ async function canRespondToChannel(
  * @param botConfig - Configuration for this bot instance
  */
 async function createDiscordClientForBot(
-  botConfig: BotConfig
+  botConfig: BotConfig,
+  messageFetchLimit: number
 ): Promise<Client> {
   const client = new Client({
     intents: [
@@ -187,7 +188,7 @@ async function createDiscordClientForBot(
       // Fetch recent conversation with caching
       const conversationArray = await ephemeralFetchConversation(
         message.channel as TextChannel | DMChannel,
-        30, // last 30 messages
+        messageFetchLimit,
         5000 // 5 second cache
       );
 
@@ -308,10 +309,19 @@ async function handleDirectMessage(
  * @param botConfigs - Array of bot configurations
  */
 async function initializeAllBots(botConfigs: BotConfig[]): Promise<Client[]> {
+  const messageFetchLimit = Number(process.env.MESSAGE_FETCH_LIMIT ?? "100");
+  if (
+    !Number.isInteger(messageFetchLimit) ||
+    messageFetchLimit < 1 ||
+    messageFetchLimit > 100
+  ) {
+    throw new Error("MESSAGE_FETCH_LIMIT must be an integer between 1 and 100");
+  }
+
   console.log(`Initializing ${botConfigs.length} bots...`);
 
   const initPromises = botConfigs.map((config) =>
-    createDiscordClientForBot(config).catch((error) => {
+    createDiscordClientForBot(config, messageFetchLimit).catch((error) => {
       console.error(`Failed to initialize bot ${config.id}:`, error);
       return null;
     })
