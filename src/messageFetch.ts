@@ -3,8 +3,8 @@ import { ConversationMessage } from "./types";
 
 // Track message cache with proper typing
 interface CacheEntry {
-  lastFetchTime: number;
-  messages: ConversationMessage[];
+  contextSize: number;
+  messages: Map<string, Message>;
 }
 
 // Cache for display names
@@ -15,6 +15,7 @@ interface DisplayNameCacheEntry {
 
 // In-memory cache for recent message fetches
 const channelCache = new Map<string, CacheEntry>();
+const pendingFetches = new Map<string, Promise<ConversationMessage[]>>();
 // Cache for display names - key is guildId:userId
 const displayNameCache = new Map<string, DisplayNameCacheEntry>();
 
@@ -87,110 +88,93 @@ async function getUserDisplayName(msg: Message): Promise<string> {
   }
 }
 
-/**
- * Fetches conversation from Discord channel
- * @param channel - The Discord channel to fetch from
- * @param limit - Number of messages to fetch
- * @returns Array of formatted messages
- */
-async function fetchConversationFromDiscord(
-  channel: TextChannel | DMChannel,
-  limit: number = 30
+/** Format the cache for the requesting bot, oldest message first. */
+async function formatConversation(
+  messages: Message[],
+  botId: string
 ): Promise<ConversationMessage[]> {
-  try {
-    // Fetch messages from Discord
-    const fetched = await channel.messages.fetch({ limit });
-
-    // Sort messages chronologically (oldest first)
-    const sorted = Array.from(fetched.values()).sort(
-      (a: Message, b: Message) => a.createdTimestamp - b.createdTimestamp
-    );
-
-    // Get our bot's client ID
-    const ourBotId = channel.client.user?.id;
-    if (!ourBotId) {
-      throw new Error("Bot client ID not found");
-    }
-
-    // Pre-fetch display names for all users except our bot
-    const uniqueUsers = new Set(
-      sorted
-        .filter((msg) => msg.author.id !== ourBotId)
-        .map((msg) => msg.author.id)
-    );
-    const displayNamePromises = Array.from(uniqueUsers).map(async (userId) => {
-      // Find first message from this user to use as reference
-      const userMsg = sorted.find((m) => m.author.id === userId);
-      if (userMsg) {
-        await getUserDisplayName(userMsg);
-      }
-    });
-
-    // Wait for all display names to be cached
-    await Promise.all(displayNamePromises);
-
-    // Now format messages using cached display names or {{ai}} for our bot's messages
-    const messages = await Promise.all(
-      sorted.map(
-        async (msg: Message): Promise<ConversationMessage> => ({
-          username:
-            msg.author.id === ourBotId
-              ? "{{ai}}"
-              : await getUserDisplayName(msg),
-          text: msg.content,
-          timestamp: msg.createdAt.toISOString(),
-        })
-      )
-    );
-
-    return messages;
-  } catch (error) {
-    console.error("Error fetching messages:", error);
-    throw new Error("Failed to fetch conversation history");
-  }
+  return Promise.all(messages.map(async (msg) => ({
+    username: msg.author.id === botId ? "{{ai}}" : await getUserDisplayName(msg),
+    text: msg.content,
+    timestamp: msg.createdAt.toISOString(),
+  })));
 }
 
-/**
- * Fetches conversation with caching support
- * @param channel - The Discord channel
- * @param limit - Number of messages to fetch
- * @param cacheDurationMs - How long to cache messages
- */
+// Snowflakes provide a stable order even when messages share a timestamp.
+function newestFirst(a: Message, b: Message): number {
+  return BigInt(a.id) > BigInt(b.id) ? -1 : BigInt(a.id) < BigInt(b.id) ? 1 : 0;
+}
+
+async function updateConversation(
+  channel: TextChannel | DMChannel,
+  contextSize: number,
+  cacheKey: string,
+  botId: string
+): Promise<ConversationMessage[]> {
+  const existing = channelCache.get(cacheKey);
+  const cached = existing?.contextSize === contextSize ? existing : undefined;
+  // Work on a copy so a failed page does not leave a partially updated cache.
+  const messages = new Map(cached?.messages);
+  const fetchedIds = new Set<string>();
+  let before: string | undefined;
+
+  while (fetchedIds.size < contextSize) {
+    const limit = cached ? 10 : Math.min(100, contextSize - fetchedIds.size);
+    const fetched = await channel.messages.fetch({ limit, before, cache: false });
+    const page = Array.from(fetched.values()).sort(newestFirst);
+    if (page.length === 0) break;
+
+    const overlaps = page.some((msg) => cached?.messages.has(msg.id));
+    for (const msg of page) {
+      messages.set(msg.id, msg);
+      fetchedIds.add(msg.id);
+    }
+    const oldestId = page[page.length - 1].id;
+    if (before && BigInt(oldestId) >= BigInt(before)) {
+      throw new Error("Discord message pagination did not advance");
+    }
+    // Once a whole context of newer messages is collected, older history
+    // cannot affect the result, even if the previous cache is far behind.
+    if (overlaps || page.length < limit || fetchedIds.size >= contextSize) break;
+    before = oldestId;
+  }
+
+  const retained = Array.from(messages.values()).sort(newestFirst).slice(0, contextSize);
+  const conversation = await formatConversation([...retained].reverse(), botId);
+  channelCache.delete(cacheKey);
+  channelCache.set(cacheKey, {
+    contextSize,
+    messages: new Map(retained.map((msg) => [msg.id, msg])),
+  });
+  // Bound inactive channel caches; evicted channels refill on their next use.
+  if (channelCache.size > 1000) {
+    const oldestKey = channelCache.keys().next().value;
+    if (oldestKey !== undefined) channelCache.delete(oldestKey);
+  }
+  return conversation;
+}
+
+/** Refresh history on every call, serializing updates for the same bot/channel. */
 async function ephemeralFetchConversation(
   channel: TextChannel | DMChannel,
-  limit: number = 30,
-  cacheDurationMs: number = 5000
+  contextSize: number = 200
 ): Promise<ConversationMessage[]> {
-  const now = Date.now();
-  const cacheKey = channel.id;
-  const cached = channelCache.get(cacheKey);
-
-  // Return cached data if it's fresh
-  if (cached && now - cached.lastFetchTime < cacheDurationMs) {
-    return cached.messages;
+  if (!Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1000) {
+    throw new Error("CURRENT_MESSAGE_CONTEXT must be an integer between 1 and 1000");
   }
-
-  // Fetch new data
-  const messages = await fetchConversationFromDiscord(channel, limit);
-
-  // Update cache
-  channelCache.set(cacheKey, {
-    lastFetchTime: now,
-    messages,
-  });
-
-  // Clean old cache entries periodically
-  if (channelCache.size > 1000) {
-    // Prevent unbounded growth
-    const oldestAllowed = now - cacheDurationMs;
-    for (const [key, value] of channelCache.entries()) {
-      if (value.lastFetchTime < oldestAllowed) {
-        channelCache.delete(key);
-      }
-    }
+  const botId = channel.client.user?.id;
+  if (!botId) throw new Error("Bot client ID not found");
+  const cacheKey = `${botId}:${channel.id}`;
+  const previous = pendingFetches.get(cacheKey);
+  const current = (previous ?? Promise.resolve()).catch(() => undefined).then(
+    () => updateConversation(channel, contextSize, cacheKey, botId)
+  );
+  pendingFetches.set(cacheKey, current);
+  try {
+    return await current;
+  } finally {
+    if (pendingFetches.get(cacheKey) === current) pendingFetches.delete(cacheKey);
   }
-
-  return messages;
 }
 
-export { fetchConversationFromDiscord, ephemeralFetchConversation };
+export { ephemeralFetchConversation };

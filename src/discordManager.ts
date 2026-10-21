@@ -119,7 +119,7 @@ async function canRespondToChannel(
  */
 async function createDiscordClientForBot(
   botConfig: BotConfig,
-  messageFetchLimit: number
+  currentMessageContext: number
 ): Promise<Client> {
   const client = new Client({
     intents: [
@@ -159,7 +159,7 @@ async function createDiscordClientForBot(
 
     // Handle DMs differently from server messages
     if (message.channel.type === ChannelType.DM) {
-      await handleDirectMessage(message, botConfig, messageFetchLimit);
+      await handleDirectMessage(message, botConfig, currentMessageContext);
       return;
     }
 
@@ -188,8 +188,7 @@ async function createDiscordClientForBot(
       // Fetch recent conversation with caching
       const conversationArray = await ephemeralFetchConversation(
         message.channel as TextChannel | DMChannel,
-        messageFetchLimit,
-        5000 // 5 second cache
+        currentMessageContext
       );
 
       // Call Kindroid AI with the conversation context
@@ -253,7 +252,7 @@ async function createDiscordClientForBot(
 async function handleDirectMessage(
   message: Message,
   botConfig: BotConfig,
-  messageFetchLimit: number
+  currentMessageContext: number
 ): Promise<void> {
   const userId = message.author.id;
   const dmKey = `${botConfig.id}-${userId}`;
@@ -278,8 +277,7 @@ async function handleDirectMessage(
       // Fetch recent conversation
       const conversationArray = await ephemeralFetchConversation(
         message.channel,
-        messageFetchLimit,
-        5000
+        currentMessageContext
       );
 
       // Call Kindroid AI
@@ -310,19 +308,20 @@ async function handleDirectMessage(
  * @param botConfigs - Array of bot configurations
  */
 async function initializeAllBots(botConfigs: BotConfig[]): Promise<Client[]> {
-  const messageFetchLimit = Number(process.env.MESSAGE_FETCH_LIMIT ?? "100");
+  const currentMessageContext = Number(process.env.CURRENT_MESSAGE_CONTEXT ?? "200");
   if (
-    !Number.isInteger(messageFetchLimit) ||
-    messageFetchLimit < 1 ||
-    messageFetchLimit > 100
+    !Number.isInteger(currentMessageContext) ||
+    currentMessageContext < 1 ||
+    currentMessageContext > 1000
   ) {
-    throw new Error("MESSAGE_FETCH_LIMIT must be an integer between 1 and 100");
+    throw new Error("CURRENT_MESSAGE_CONTEXT must be an integer between 1 and 1000");
   }
 
+  console.log(`Conversation context: ${currentMessageContext} messages (servers and DMs)`);
   console.log(`Initializing ${botConfigs.length} bots...`);
 
   const initPromises = botConfigs.map((config) =>
-    createDiscordClientForBot(config, messageFetchLimit).catch((error) => {
+    createDiscordClientForBot(config, currentMessageContext).catch((error) => {
       console.error(`Failed to initialize bot ${config.id}:`, error);
       return null;
     })
