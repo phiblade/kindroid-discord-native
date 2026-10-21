@@ -8,7 +8,7 @@ A Node.js service that manages multiple Discord bots, each tied to a unique Kind
 
 - **Multi-bot** support: Run multiple Discord bots from a single service
 - **Kindroid AI integration**: Each bot is tied to a unique AI persona (via `SHARED_AI_CODE_n`)
-- **JIT message fetching**: Fetches configurable server conversation history (default: 100 messages); direct messages use 30 messages
+- **JIT message fetching**: Fetches configurable conversation history for servers and direct messages (default: 100 messages)
 - **Caching**: Minimizes redundant Discord API calls
 - **Graceful shutdown**: Bots disconnect on SIGINT/SIGTERM
 - **Configurable NSFW filtering** via environment variables
@@ -62,7 +62,7 @@ Use environment variables to configure your bots. The .env.example file shows us
 
 - KINDROID_INFER_URL: The Kindroid AI API endpoint, and should not change
 - KINDROID_API_KEY: Your Kindroid AI API key
-- MESSAGE_FETCH_LIMIT: (Optional) Number of recent server messages to fetch for context. Must be an integer from 1 to 100; defaults to 100 when unset. Set it in `.env` and restart the service to apply changes. Direct messages continue to use 30 messages.
+- MESSAGE_FETCH_LIMIT: (Optional) Number of recent messages to fetch for context in servers and direct messages. Must be an integer from 1 to 100; defaults to 100 when unset. Set it in `.env` and restart the service to apply changes.
 - SHARED_AI_CODE_n: The share code to identify which AI persona to use for the n-th bot
 - BOT_TOKEN_n: Discord bot token for the n-th bot
 - ENABLE_FILTER_n: (Optional) true or false to enable NSFW filtering for the n-th bot

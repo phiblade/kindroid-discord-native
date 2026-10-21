@@ -159,7 +159,7 @@ async function createDiscordClientForBot(
 
     // Handle DMs differently from server messages
     if (message.channel.type === ChannelType.DM) {
-      await handleDirectMessage(message, botConfig);
+      await handleDirectMessage(message, botConfig, messageFetchLimit);
       return;
     }
 
@@ -252,7 +252,8 @@ async function createDiscordClientForBot(
  */
 async function handleDirectMessage(
   message: Message,
-  botConfig: BotConfig
+  botConfig: BotConfig,
+  messageFetchLimit: number
 ): Promise<void> {
   const userId = message.author.id;
   const dmKey = `${botConfig.id}-${userId}`;
@@ -277,7 +278,7 @@ async function handleDirectMessage(
       // Fetch recent conversation
       const conversationArray = await ephemeralFetchConversation(
         message.channel,
-        30,
+        messageFetchLimit,
         5000
       );
 
