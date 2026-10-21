@@ -16,7 +16,8 @@ import {
 export async function callKindroidAI(
   sharedAiCode: string,
   conversation: ConversationMessage[],
-  enableFilter: boolean = false
+  enableFilter: boolean = false,
+  logContext?: { botId: string; channelId: string }
 ): Promise<KindroidAIResult> {
   try {
     if (conversation.length === 0) {
@@ -31,6 +32,10 @@ export async function callKindroidAI(
       .replace(/[^a-zA-Z0-9]/g, "")
       .slice(0, 32); // Limit length to 32 chars
 
+    const logPrefix = logContext
+      ? `[Kindroid bot=${logContext.botId} channel=${logContext.channelId}]`
+      : "[Kindroid]";
+    console.log(`${logPrefix} sending messages=${conversation.length}`);
     const response = await axios.post<KindroidResponse>(
       process.env.KINDROID_INFER_URL!,
       {
@@ -50,6 +55,8 @@ export async function callKindroidAI(
     if (!response.data.success) {
       throw new Error(response.data.error || "API request failed");
     }
+
+    console.log(`${logPrefix} succeeded messages=${conversation.length}`);
 
     return {
       type: "success",

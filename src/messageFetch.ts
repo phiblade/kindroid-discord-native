@@ -117,12 +117,20 @@ async function updateConversation(
   // Work on a copy so a failed page does not leave a partially updated cache.
   const messages = new Map(cached?.messages);
   const fetchedIds = new Set<string>();
+  const logPrefix = `[History bot=${botId} channel=${channel.id}]`;
+  let pages = 0;
+  let fetchedCount = 0;
   let before: string | undefined;
 
   while (fetchedIds.size < contextSize) {
     const limit = cached ? Math.min(10, fetchBatch) : Math.min(fetchBatch, contextSize - fetchedIds.size);
     const fetched = await channel.messages.fetch({ limit, before, cache: false });
     const page = Array.from(fetched.values()).sort(newestFirst);
+    pages++;
+    fetchedCount += page.length;
+    console.log(
+      `${logPrefix} fetch page=${pages} requested=${limit} received=${page.length}`
+    );
     if (page.length === 0) break;
 
     const overlaps = page.some((msg) => cached?.messages.has(msg.id));
@@ -147,6 +155,13 @@ async function updateConversation(
     contextSize,
     messages: new Map(retained.map((msg) => [msg.id, msg])),
   });
+  const newCount = Array.from(fetchedIds).filter((id) => !cached?.messages.has(id)).length;
+  console.log(
+    `${logPrefix} refreshed mode=${cached ? "incremental" : "initial"}` +
+    ` pages=${pages} fetched=${fetchedCount} new=${newCount}` +
+    ` cached_before=${cached?.messages.size ?? 0} cached_after=${retained.length}` +
+    ` trimmed=${messages.size - retained.length} context=${conversation.length}`
+  );
   // Bound inactive channel caches; evicted channels refill on their next use.
   if (channelCache.size > 1000) {
     const oldestKey = channelCache.keys().next().value;

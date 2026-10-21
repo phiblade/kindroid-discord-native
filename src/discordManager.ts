@@ -197,7 +197,8 @@ async function createDiscordClientForBot(
       const aiResult = await callKindroidAI(
         botConfig.sharedAiCode,
         conversationArray,
-        botConfig.enableFilter
+        botConfig.enableFilter,
+        { botId: botUser.id, channelId: message.channel.id }
       );
 
       // If rate limited, silently ignore
@@ -288,7 +289,8 @@ async function handleDirectMessage(
       const aiResult = await callKindroidAI(
         botConfig.sharedAiCode,
         conversationArray,
-        botConfig.enableFilter
+        botConfig.enableFilter,
+        { botId: message.channel.client.user?.id ?? botConfig.id, channelId: message.channel.id }
       );
 
       // If rate limited, silently ignore

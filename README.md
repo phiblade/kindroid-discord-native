@@ -76,6 +76,8 @@ You can create as many bots as you want by incrementing the number (\_1, \_2, \_
 
 ## Error Handling
 
+Runtime logs include `[History bot=... channel=...]` entries for each Discord page (requested and received counts) and a refresh summary (fetched, new, cached before/after, trimmed, and selected context counts). `[Kindroid bot=... channel=...]` entries report the actual outgoing message count before the request and confirm successful responses. These count logs do not include message contents or credentials. `fetched` includes messages already present in the cache; `new` counts only previously uncached message IDs.
+
 - Failed bot initialization is logged; other bots still initialize
 - Conversation fetch failures are caught and logged
 - API call errors log diagnostic info and return a friendly user message
