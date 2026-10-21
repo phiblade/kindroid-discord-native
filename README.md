@@ -1,4 +1,12 @@
-# Kindroid Discord Multi-Bot Manager
+# Kindroid Discord Native
+
+This repository is the starting point for a durable Discord home-room bridge to Kindroid's native API. Native behavior is currently in design; the code and setup instructions below still describe the inherited Discord-endpoint connector.
+
+- [Native bridge design](docs/design.md)
+- [API limits and recovery findings](docs/api-findings.md)
+- [Staged implementation plan](docs/implementation-plan.md)
+
+## Inherited connector documentation
 
 Tutorial on how to use this repo: https://docs.kindroid.ai/official-discord-bot-integration
 
