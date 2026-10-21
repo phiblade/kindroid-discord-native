@@ -25,22 +25,43 @@ export class HomeRoomIngestion {
     this.config = store.config(id);
     store.setRecovering(id); // Install before starting a delivery loop or logging in.
   }
+  private counts(): Record<string, number> {
+    return {
+      cached: this.store.messages(this.id).length,
+      pending: this.store.pending(this.id).length,
+    };
+  }
   create(message: IncomingMessage): void {
     const result = this.store.ingest(this.id, message);
     if (result !== 'ignored') {
-      this.log('ingested', {
-        cached: this.store.messages(this.id).length,
-        pending: this.store.pending(this.id).length,
-      });
+      this.log('ingested', this.counts());
       this.wake();
     }
   }
   edit(message: IncomingMessage): void {
-    if (this.store.bridge(this.id).boundary) this.create(message);
+    if (!this.store.bridge(this.id).boundary) return;
+    const result = this.store.ingest(this.id, message);
+    if (result === 'ignored') return;
+    const event =
+      result === 'deferred_edit'
+        ? 'edit_deferred'
+        : result === 'duplicate'
+          ? 'edit_unchanged'
+          : 'edited';
+    this.log(event, this.counts());
+    this.wake();
   }
   delete(channelId: string, ids: string[]): void {
-    if (channelId === this.config.channelId)
-      this.store.observeDeletion(this.id, ids);
+    if (channelId !== this.config.channelId) return;
+    const boundary = this.store.bridge(this.id).boundary;
+    if (!boundary) return;
+    const eligible = [...new Set(ids)].filter(
+      (id) =>
+        BigInt(id) >= BigInt(boundary) && !this.store.isDeleted(this.id, id),
+    );
+    this.store.observeDeletion(this.id, eligible);
+    if (eligible.length)
+      this.log('deleted', { messages: eligible.length, ...this.counts() });
   }
   disconnect(): void {
     this.online = false;
