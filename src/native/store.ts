@@ -142,23 +142,50 @@ export class BridgeStore {
 
   register(config: BridgeConfig): void {
     validateConfig(config);
-    const prior = this.one<{ config: string }>(
-      'SELECT config FROM bridges WHERE id=?',
-      config.id,
-    );
-    if (prior && prior.config !== JSON.stringify(config))
-      throw new Error(
-        'Bridge configuration changed; explicit migration required',
+    this.transaction('register', () => {
+      const prior = this.one<{ config: string; boundary: string | null }>(
+        'SELECT config,boundary FROM bridges WHERE id=?',
+        config.id,
       );
-    this.transaction('register', () =>
+      if (prior) {
+        const saved = JSON.parse(prior.config) as BridgeConfig;
+        const changed = (Object.keys(config) as (keyof BridgeConfig)[]).filter(
+          (key) => saved[key] !== config[key],
+        );
+        if (!changed.length) return;
+        const hasHistory =
+          prior.boundary !== null ||
+          this.one(
+            'SELECT 1 FROM messages WHERE bridge_id=? LIMIT 1',
+            config.id,
+          ) ||
+          this.one(
+            'SELECT 1 FROM batches WHERE bridge_id=? LIMIT 1',
+            config.id,
+          );
+        if (hasHistory || this.workers.has(config.id)) {
+          throw new Error(
+            `Bridge configuration changed (${changed.join(', ')}); explicit migration required because the bridge has recorded history or an active delivery loop`,
+          );
+        }
+        // Setup may fail after registration but before the first eligible message.
+        this.run(
+          'UPDATE bridges SET config=?,kin_id=? WHERE id=?',
+          JSON.stringify(config),
+          config.kinId,
+          config.id,
+        );
+        return;
+      }
       this.run(
-        'INSERT INTO bridges(id,config,kin_id) VALUES(?,?,?) ON CONFLICT(id) DO NOTHING',
+        'INSERT INTO bridges(id,config,kin_id) VALUES(?,?,?)',
         config.id,
         JSON.stringify(config),
         config.kinId,
-      ),
-    );
+      );
+    });
   }
+
   config(id: string): BridgeConfig {
     const row = this.one<{ config: string }>(
       'SELECT config FROM bridges WHERE id=?',

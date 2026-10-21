@@ -702,3 +702,35 @@ test('prune rollback never loses replay receipts or durable messages', (t) => {
   assert.equal(f.store.prune('bridge', 0), 1);
   assert.equal(f.store.ingest('bridge', message(1)), 'duplicate');
 });
+
+test('empty setup accepts corrected configuration but recorded history stays protected', async (t) => {
+  const f = fixture(t);
+  const corrected = config({ botId: '901' });
+  f.store.register(corrected);
+  assert.equal(f.store.config('bridge').botId, '901');
+  // Property order is not a configuration change.
+  f.store.register(Object.fromEntries(Object.entries(corrected).reverse()));
+  f.store.ingest('bridge', message(1));
+  assert.throws(() => f.store.register(config()), /botId.*recorded history/);
+  assert.equal(f.store.config('bridge').botId, '901');
+  assert.equal(f.store.pending('bridge').length, 1);
+});
+
+test('empty configuration correction still enforces unique kin and active worker protection', (t) => {
+  const f = fixture(t);
+  f.store.register(config({ id: 'other', kinId: 'other-kin' }));
+  assert.throws(
+    () => f.store.register(config({ kinId: 'other-kin' })),
+    /UNIQUE/,
+  );
+  assert.equal(f.store.config('bridge').kinId, 'kin');
+  const release = f.store.claimWorker('bridge');
+  try {
+    assert.throws(
+      () => f.store.register(config({ botId: '901' })),
+      /active delivery loop/,
+    );
+  } finally {
+    release();
+  }
+});
