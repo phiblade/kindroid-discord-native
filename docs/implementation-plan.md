@@ -37,7 +37,7 @@ Replace share-code calls with native Kin ID delivery. Add the shared account lim
 
 Verify that all substantive replies are posted even when backlog remains. Resume unfinished replies before new generation. API errors are never treated as public speech, and ambiguous posts are never blindly repeated.
 
-Update package identity, runtime README, environment examples, and logs. Remove obsolete Discord-endpoint settings and snapshot assumptions only when their replacements exist. The native repository is published at `pzentt/kindroid-discord-native`.
+Update package identity, runtime README, environment examples, and logs. Remove obsolete Discord-endpoint settings and snapshot assumptions only when their replacements exist. The native repository is published at `pzentw-productions/kindroid-discord-native`.
 
 ## Milestone 4 Controlled Railway trial
 
