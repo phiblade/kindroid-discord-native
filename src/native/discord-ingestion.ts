@@ -10,6 +10,21 @@ import { BridgeStore } from './store';
 import { HomeRoomIngestion } from './ingestion';
 import { IncomingMessage } from './types';
 
+/** Preserve readable embed text; decorative media is intentionally omitted. */
+function messageText(message: Message): string {
+  const parts = [message.content];
+  for (const embed of message.embeds ?? []) {
+    if (embed.title) parts.push(embed.title);
+    if (embed.description) parts.push(embed.description);
+    for (const field of embed.fields ?? [])
+      parts.push(`${field.name}: ${field.value}`);
+    // A description may already contain the destination as a Markdown link.
+    if (embed.url && !parts.some((part) => part.includes(embed.url!)))
+      parts.push(embed.url);
+  }
+  return parts.filter((part) => part.length > 0).join('\n');
+}
+
 export function discordMessage(message: Message): IncomingMessage {
   return {
     id: message.id,
@@ -19,7 +34,7 @@ export function discordMessage(message: Message): IncomingMessage {
       message.member?.displayName ??
       message.author.globalName ??
       message.author.username,
-    content: message.content,
+    content: messageText(message),
     timestamp: message.createdTimestamp,
     version: message.editedTimestamp ?? 0,
     isDM: !message.inGuild(),

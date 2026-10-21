@@ -8,6 +8,7 @@ const { HomeRoomIngestion } = require('../dist/native/ingestion');
 const { DeliveryLoop } = require('../dist/native/delivery');
 const { FakeClock, FakeKin, FakeDiscord } = require('../dist/native/fakes');
 const { DatabaseSync } = require('node:sqlite');
+const { discordMessage } = require('../dist/native/discord-ingestion');
 const cfg = {
   id: 'b',
   botId: '900',
@@ -69,6 +70,74 @@ function gate() {
   });
   return { promise, resolve };
 }
+
+function embeddedMessage(content, embeds) {
+  return discordMessage({
+    id: '10',
+    channelId: '800',
+    author: { id: '700', username: 'GitHub' },
+    content,
+    embeds,
+    createdTimestamp: 10,
+    editedTimestamp: null,
+    inGuild: () => true,
+  });
+}
+
+test('GitHub embed-only notifications persist and reach the Kin batch', (t) => {
+  const f = fixture(t);
+  const url =
+    'https://github.com/pzentw-productions/kindroid-discord-native/commit/4469a45';
+  const incoming = embeddedMessage('', [
+    {
+      title: '[kindroid-discord-native:main] 1 new commit',
+      description: '4469a45 Update repository ownership reference — pzentt',
+      url,
+      thumbnail: { url: 'https://example.com/avatar.png' },
+    },
+  ]);
+  const expected = `[kindroid-discord-native:main] 1 new commit\n4469a45 Update repository ownership reference — pzentt\n${url}`;
+  assert.equal(incoming.content, expected);
+  f.store.ingest('b', incoming);
+  f.reopen();
+  assert.equal(f.store.messages('b')[0].content, expected);
+  assert.ok(
+    f.store.prepare('b', 0).payload.includes(`**GitHub**\n${expected}`),
+  );
+});
+
+test('embed rendering preserves text and embed order, fields, and unique destination links', () => {
+  const url = 'https://example.com/change';
+  const incoming = embeddedMessage('Look at this:', [
+    {
+      title: 'First',
+      description: `[Change](${url})`,
+      fields: [{ name: 'Branch', value: 'main' }],
+      url,
+    },
+    {
+      title: 'Second',
+      description: 'Details',
+      fields: [{ name: 'Status', value: 'Passed' }],
+      url: 'https://example.com/status',
+    },
+    { image: { url: 'https://example.com/image.png' }, color: 123 },
+  ]);
+  assert.equal(
+    incoming.content,
+    `Look at this:\nFirst\n[Change](${url})\nBranch: main\nSecond\nDetails\nStatus: Passed\nhttps://example.com/status`,
+  );
+});
+
+test('ordinary text remains unchanged when embeds contain no supported text', () => {
+  assert.equal(embeddedMessage('hello\n\nworld', []).content, 'hello\n\nworld');
+  assert.equal(
+    embeddedMessage('hello', [
+      { thumbnail: { url: 'https://example.com/icon' } },
+    ]).content,
+    'hello',
+  );
+});
 
 test('fresh room ignores history, DMs, other rooms, own initial messages and edits', async (t) => {
   const f = fixture(t);

@@ -96,7 +96,7 @@ Keep the database and its journals on persistent storage and back them up togeth
 
 ## Current scope
 
-The bridge handles text messages, live edits/deletions, and one home room. Images, attachments, reactions, and room whitelists are not implemented. It does not reset or configure the Kin's personality automatically.
+The bridge handles text messages, embed text, live edits/deletions, and one home room. Embed titles, descriptions, fields (`Name: value`), and destination links follow the ordinary message text. Decorative icons, thumbnails, and colors are omitted. Images, attachments, reactions, and room whitelists are not implemented. It does not reset or configure the Kin's personality automatically.
 
 Normal delivery has been exercised locally. Automated tests use fake transports or mocked HTTP/Discord responses; live interrupted-generation recovery and backup restoration still need controlled verification.
 
