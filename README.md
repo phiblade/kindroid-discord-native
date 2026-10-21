@@ -62,11 +62,12 @@ Use environment variables to configure your bots. The .env.example file shows us
 
 - KINDROID_INFER_URL: The Kindroid AI API endpoint, and should not change
 - KINDROID_API_KEY: Your Kindroid AI API key
-- CURRENT_MESSAGE_CONTEXT: (Optional) Maximum number of recent messages sent to Kindroid in servers and direct messages. Must be an integer from 1 to 1000; defaults to 200. Set it in `.env` or your hosting environment and restart the service. This replaces `MESSAGE_FETCH_LIMIT`.
+- KINDROID_MESSAGE_CONTEXT: (Optional) Maximum number of recent messages sent to Kindroid in servers and direct messages. Must be an integer from 1 to 1000; defaults to 200. Set it in `.env` or your hosting environment and restart the service. This replaces `CURRENT_MESSAGE_CONTEXT`.
+- DISCORD_FETCH_BATCH: (Optional) Discord initial fetch page size, an integer from 1 to 100; defaults to 100. Incremental checks use the smaller of this value and 10. This replaces the old `MESSAGE_FETCH_LIMIT` setting.
 
-History is cached in memory separately for each bot and channel. The first request fetches pages of up to 100 messages until the context is full or history runs out. Every later request fetches the latest 10 messages and pages backward in batches of 10 until it finds cached messages, reaches the start of history, or gathers a full new context. New messages are merged by Discord message ID, the oldest excess messages are discarded, and Kindroid receives messages oldest-first. Short channels are checked for new messages without repeatedly loading their entire history. Caches refill after a restart. Edits to fetched messages are refreshed; older edits and deletions are not reconciled by this incremental algorithm.
+History is cached in memory separately for each bot and channel. The first request fetches pages of up to `DISCORD_FETCH_BATCH` messages until the context is full or history runs out. Every later request fetches the latest messages and pages backward in batches of up to 10 (capped by `DISCORD_FETCH_BATCH`) until it finds cached messages, reaches the start of history, or gathers a full new context. New messages are merged by Discord message ID, the cache is trimmed to the newest 1,000 messages when it grows beyond that size, and Kindroid receives only the newest `KINDROID_MESSAGE_CONTEXT` messages, oldest-first. Short channels are checked for new messages without repeatedly loading their entire history. Caches refill after a restart. Edits to fetched messages are refreshed; older edits and deletions are not reconciled by this incremental algorithm.
 
-On Railway, set `CURRENT_MESSAGE_CONTEXT=200` in the service variables; the local `.env` is ignored by Git.
+On Railway, set `KINDROID_MESSAGE_CONTEXT=200` and `DISCORD_FETCH_BATCH=100` in the service variables; the local `.env` is ignored by Git.
 - SHARED_AI_CODE_n: The share code to identify which AI persona to use for the n-th bot
 - BOT_TOKEN_n: Discord bot token for the n-th bot
 - ENABLE_FILTER_n: (Optional) true or false to enable NSFW filtering for the n-th bot

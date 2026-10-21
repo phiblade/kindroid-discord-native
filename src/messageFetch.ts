@@ -108,6 +108,7 @@ function newestFirst(a: Message, b: Message): number {
 async function updateConversation(
   channel: TextChannel | DMChannel,
   contextSize: number,
+  fetchBatch: number,
   cacheKey: string,
   botId: string
 ): Promise<ConversationMessage[]> {
@@ -119,7 +120,7 @@ async function updateConversation(
   let before: string | undefined;
 
   while (fetchedIds.size < contextSize) {
-    const limit = cached ? 10 : Math.min(100, contextSize - fetchedIds.size);
+    const limit = cached ? Math.min(10, fetchBatch) : Math.min(fetchBatch, contextSize - fetchedIds.size);
     const fetched = await channel.messages.fetch({ limit, before, cache: false });
     const page = Array.from(fetched.values()).sort(newestFirst);
     if (page.length === 0) break;
@@ -139,8 +140,8 @@ async function updateConversation(
     before = oldestId;
   }
 
-  const retained = Array.from(messages.values()).sort(newestFirst).slice(0, contextSize);
-  const conversation = await formatConversation([...retained].reverse(), botId);
+  const retained = Array.from(messages.values()).sort(newestFirst).slice(0, 1000);
+  const conversation = await formatConversation(retained.slice(0, contextSize).reverse(), botId);
   channelCache.delete(cacheKey);
   channelCache.set(cacheKey, {
     contextSize,
@@ -157,17 +158,21 @@ async function updateConversation(
 /** Refresh history on every call, serializing updates for the same bot/channel. */
 async function ephemeralFetchConversation(
   channel: TextChannel | DMChannel,
-  contextSize: number = 200
+  contextSize: number = 200,
+  fetchBatch: number = 100
 ): Promise<ConversationMessage[]> {
   if (!Number.isInteger(contextSize) || contextSize < 1 || contextSize > 1000) {
-    throw new Error("CURRENT_MESSAGE_CONTEXT must be an integer between 1 and 1000");
+    throw new Error("KINDROID_MESSAGE_CONTEXT must be an integer between 1 and 1000");
+  }
+  if (!Number.isInteger(fetchBatch) || fetchBatch < 1 || fetchBatch > 100) {
+    throw new Error("DISCORD_FETCH_BATCH must be an integer between 1 and 100");
   }
   const botId = channel.client.user?.id;
   if (!botId) throw new Error("Bot client ID not found");
   const cacheKey = `${botId}:${channel.id}`;
   const previous = pendingFetches.get(cacheKey);
   const current = (previous ?? Promise.resolve()).catch(() => undefined).then(
-    () => updateConversation(channel, contextSize, cacheKey, botId)
+    () => updateConversation(channel, contextSize, fetchBatch, cacheKey, botId)
   );
   pendingFetches.set(cacheKey, current);
   try {

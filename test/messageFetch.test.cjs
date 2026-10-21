@@ -87,7 +87,7 @@ test('supports bounds, rejects invalid sizes, and refills after context change',
     assert.ok(f.calls.every(c => c.limit <= 100));
   }
   for (const size of [0, 1001, 1.5, NaN]) {
-    await assert.rejects(fetchHistory(fixture(1).channel, size), /CURRENT_MESSAGE_CONTEXT/);
+    await assert.rejects(fetchHistory(fixture(1).channel, size), /KINDROID_MESSAGE_CONTEXT/);
   }
   const f = fixture(250);
   await fetchHistory(f.channel, 10);
@@ -115,4 +115,45 @@ test('serializes concurrent requests and isolates bots sharing a channel', async
   assert.equal(results[0][0].username, '{{ai}}');
   assert.equal(otherResult[0].username, 'Other bot');
   assert.deepEqual(other.calls.map(c => c.limit), [100, 100]);
+});
+
+test('configurable Discord batch controls initial pages and caps incremental pages', async () => {
+  const f = fixture(25);
+  await fetchHistory(f.channel, 20, 7);
+  assert.deepEqual(f.calls.map(c => c.limit), [7, 7, 6]);
+  f.append(8);
+  const result = await fetchHistory(f.channel, 20, 7);
+  assert.deepEqual(f.calls.slice(3).map(c => c.limit), [7, 7]);
+  assert.equal(result.at(-1).text, '33');
+  for (const batch of [0, 101, 1.5, NaN]) {
+    await assert.rejects(fetchHistory(f.channel, 20, batch), /DISCORD_FETCH_BATCH/);
+  }
+});
+
+test('cache grows beyond payload size but retains only the newest 1000 messages', async () => {
+  // Inspect private state in an isolated compiled module, without exposing it in production.
+  const { readFileSync } = require('node:fs');
+  const { createRequire } = require('node:module');
+  const { runInNewContext } = require('node:vm');
+  const path = require.resolve('../dist/messageFetch');
+  const isolated = { exports: {} };
+  runInNewContext(readFileSync(path, 'utf8') + '\nexports.cacheForTest = channelCache;', {
+    exports: isolated.exports, require: createRequire(path), console,
+  });
+  const { ephemeralFetchConversation: fetch, cacheForTest } = isolated.exports;
+  const f = fixture(200);
+  await fetch(f.channel, 200);
+  f.append(50);
+  assert.equal((await fetch(f.channel, 200)).length, 200);
+  assert.equal(cacheForTest.get(`bot:${f.channel.id}`).messages.size, 250);
+  for (let i = 0; i < 5; i++) {
+    f.append(200);
+    const result = await fetch(f.channel, 200);
+    assert.equal(result.length, 200);
+    assert.equal(result.at(-1).text, String(450 + i * 200));
+  }
+  const cached = cacheForTest.get(`bot:${f.channel.id}`).messages;
+  assert.equal(cached.size, 1000);
+  assert.equal(Math.min(...Array.from(cached.keys(), Number)), 251);
+  assert.equal(Math.max(...Array.from(cached.keys(), Number)), 1250);
 });

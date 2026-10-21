@@ -18,9 +18,10 @@ require('axios').post = async (_url, body) => {
 const { initializeAllBots } = require('../dist/discordManager');
 
 test('environment reaches paginated fetch and Kindroid payload in both servers and DMs', async () => {
+  process.env.DISCORD_FETCH_BATCH = '7';
   for (const value of ['1', '200', '1000', undefined]) {
-    if (value === undefined) delete process.env.CURRENT_MESSAGE_CONTEXT;
-    else process.env.CURRENT_MESSAGE_CONTEXT = value;
+    if (value === undefined) delete process.env.KINDROID_MESSAGE_CONTEXT;
+    else process.env.KINDROID_MESSAGE_CONTEXT = value;
     await initializeAllBots([{ id: 'test', discordBotToken: 'fake', sharedAiCode: 'fake' }]);
     for (const isDM of [true, false]) {
       let replied = false;
@@ -33,7 +34,7 @@ test('environment reaches paginated fetch and Kindroid payload in both servers a
         isTextBased: () => true, isDMBased: () => isDM, isThread: () => false,
         permissionsFor: () => ({ has: () => true }), client: clients.at(-1),
         messages: { fetch: async ({limit, before}) => {
-          assert.ok(limit >= 1 && limit <= 100);
+          assert.ok(limit >= 1 && limit <= 7);
           return new Map(history.filter(m => !before || Number(m.id) < Number(before))
             .slice(0, limit).map(m => [m.id, m]));
         } },
@@ -49,8 +50,13 @@ test('environment reaches paginated fetch and Kindroid payload in both servers a
 
 test('invalid environment settings fail before bot login', async () => {
   for (const value of ['', '0', '1001', '1.5', 'bad']) {
-    process.env.CURRENT_MESSAGE_CONTEXT = value;
-    await assert.rejects(initializeAllBots([]), /CURRENT_MESSAGE_CONTEXT/);
+    process.env.KINDROID_MESSAGE_CONTEXT = value;
+    await assert.rejects(initializeAllBots([]), /KINDROID_MESSAGE_CONTEXT/);
   }
-  delete process.env.CURRENT_MESSAGE_CONTEXT;
+  delete process.env.KINDROID_MESSAGE_CONTEXT;
+  for (const value of ['', '0', '101', '1.5', 'bad']) {
+    process.env.DISCORD_FETCH_BATCH = value;
+    await assert.rejects(initializeAllBots([]), /DISCORD_FETCH_BATCH/);
+  }
+  delete process.env.DISCORD_FETCH_BATCH;
 });

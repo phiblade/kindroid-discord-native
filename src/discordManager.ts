@@ -119,7 +119,8 @@ async function canRespondToChannel(
  */
 async function createDiscordClientForBot(
   botConfig: BotConfig,
-  currentMessageContext: number
+  kindroidMessageContext: number,
+  discordFetchBatch: number
 ): Promise<Client> {
   const client = new Client({
     intents: [
@@ -159,7 +160,7 @@ async function createDiscordClientForBot(
 
     // Handle DMs differently from server messages
     if (message.channel.type === ChannelType.DM) {
-      await handleDirectMessage(message, botConfig, currentMessageContext);
+      await handleDirectMessage(message, botConfig, kindroidMessageContext, discordFetchBatch);
       return;
     }
 
@@ -188,7 +189,8 @@ async function createDiscordClientForBot(
       // Fetch recent conversation with caching
       const conversationArray = await ephemeralFetchConversation(
         message.channel as TextChannel | DMChannel,
-        currentMessageContext
+        kindroidMessageContext,
+        discordFetchBatch
       );
 
       // Call Kindroid AI with the conversation context
@@ -252,7 +254,8 @@ async function createDiscordClientForBot(
 async function handleDirectMessage(
   message: Message,
   botConfig: BotConfig,
-  currentMessageContext: number
+  kindroidMessageContext: number,
+  discordFetchBatch: number
 ): Promise<void> {
   const userId = message.author.id;
   const dmKey = `${botConfig.id}-${userId}`;
@@ -277,7 +280,8 @@ async function handleDirectMessage(
       // Fetch recent conversation
       const conversationArray = await ephemeralFetchConversation(
         message.channel,
-        currentMessageContext
+        kindroidMessageContext,
+        discordFetchBatch
       );
 
       // Call Kindroid AI
@@ -308,20 +312,26 @@ async function handleDirectMessage(
  * @param botConfigs - Array of bot configurations
  */
 async function initializeAllBots(botConfigs: BotConfig[]): Promise<Client[]> {
-  const currentMessageContext = Number(process.env.CURRENT_MESSAGE_CONTEXT ?? "200");
+  const kindroidMessageContext = Number(process.env.KINDROID_MESSAGE_CONTEXT ?? "200");
   if (
-    !Number.isInteger(currentMessageContext) ||
-    currentMessageContext < 1 ||
-    currentMessageContext > 1000
+    !Number.isInteger(kindroidMessageContext) ||
+    kindroidMessageContext < 1 ||
+    kindroidMessageContext > 1000
   ) {
-    throw new Error("CURRENT_MESSAGE_CONTEXT must be an integer between 1 and 1000");
+    throw new Error("KINDROID_MESSAGE_CONTEXT must be an integer between 1 and 1000");
   }
 
-  console.log(`Conversation context: ${currentMessageContext} messages (servers and DMs)`);
+  const discordFetchBatch = Number(process.env.DISCORD_FETCH_BATCH ?? "100");
+  if (!Number.isInteger(discordFetchBatch) || discordFetchBatch < 1 || discordFetchBatch > 100) {
+    throw new Error("DISCORD_FETCH_BATCH must be an integer between 1 and 100");
+  }
+
+  console.log(`Discord fetch batch: ${discordFetchBatch} messages`);
+  console.log(`Conversation context: ${kindroidMessageContext} messages (servers and DMs)`);
   console.log(`Initializing ${botConfigs.length} bots...`);
 
   const initPromises = botConfigs.map((config) =>
-    createDiscordClientForBot(config, currentMessageContext).catch((error) => {
+    createDiscordClientForBot(config, kindroidMessageContext, discordFetchBatch).catch((error) => {
       console.error(`Failed to initialize bot ${config.id}:`, error);
       return null;
     })
