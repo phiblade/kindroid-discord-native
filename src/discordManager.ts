@@ -9,7 +9,7 @@ import {
   PermissionFlagsBits,
   Partials,
 } from "discord.js";
-import { ephemeralFetchConversation } from "./messageFetch";
+import { ephemeralFetchConversation, shouldPrependSpeaker } from "./messageFetch";
 import { callKindroidAI } from "./kindroidAPI";
 import { BotConfig, DMConversationCount } from "./types";
 
@@ -329,6 +329,7 @@ async function initializeAllBots(botConfigs: BotConfig[]): Promise<Client[]> {
   }
 
   console.log(`Discord fetch batch: ${discordFetchBatch} messages`);
+  console.log(`Prepend speaker to content: ${shouldPrependSpeaker() ? "yes" : "no"}`);
   console.log(`Conversation context: ${kindroidMessageContext} messages (servers and DMs)`);
   console.log(`Initializing ${botConfigs.length} bots...`);
 

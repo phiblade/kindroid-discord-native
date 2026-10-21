@@ -42,7 +42,7 @@ test('environment reaches paginated fetch and Kindroid payload in both servers a
       await clients.at(-1).handlers.messageCreate({ channel, author: { id: 'human', bot: false },
         mentions: { users: { has: () => true } }, content: 'testbot', reply: async () => { replied = true; } });
       assert.equal(payload.length, Number(value ?? 200));
-      assert.equal(payload.at(-1).text, '1100');
+      assert.equal(payload.at(-1).text, '[{{ai}}]: 1100');
       assert.equal(replied, true);
     }
   }

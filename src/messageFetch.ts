@@ -88,16 +88,27 @@ async function getUserDisplayName(msg: Message): Promise<string> {
   }
 }
 
+export function shouldPrependSpeaker(): boolean {
+  const value = (process.env.CONTENT_PREPEND_SPEAKER ?? "yes").trim().toLowerCase();
+  if (["yes", "true", "1"].includes(value)) return true;
+  if (["no", "false", "0"].includes(value)) return false;
+  throw new Error("CONTENT_PREPEND_SPEAKER must be yes/no, true/false, or 1/0");
+}
+
 /** Format the cache for the requesting bot, oldest message first. */
 async function formatConversation(
   messages: Message[],
   botId: string
 ): Promise<ConversationMessage[]> {
-  return Promise.all(messages.map(async (msg) => ({
-    username: msg.author.id === botId ? "{{ai}}" : await getUserDisplayName(msg),
-    text: msg.content,
-    timestamp: msg.createdAt.toISOString(),
-  })));
+  const prependSpeaker = shouldPrependSpeaker();
+  return Promise.all(messages.map(async (msg) => {
+    const username = msg.author.id === botId ? "{{ai}}" : await getUserDisplayName(msg);
+    return {
+      username,
+      text: prependSpeaker ? `[${username}]: ${msg.content}` : msg.content,
+      timestamp: msg.createdAt.toISOString(),
+    };
+  }));
 }
 
 // Snowflakes provide a stable order even when messages share a timestamp.

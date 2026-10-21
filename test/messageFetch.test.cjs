@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { ephemeralFetchConversation: fetchHistory } = require('../dist/messageFetch');
+process.env.CONTENT_PREPEND_SPEAKER = 'no';
 let channelId = 0;
 function fixture(count, botId = 'bot') {
   const calls = [];
@@ -138,7 +139,7 @@ test('cache grows beyond payload size but retains only the newest 1000 messages'
   const path = require.resolve('../dist/messageFetch');
   const isolated = { exports: {} };
   runInNewContext(readFileSync(path, 'utf8') + '\nexports.cacheForTest = channelCache;', {
-    exports: isolated.exports, require: createRequire(path), console,
+    exports: isolated.exports, require: createRequire(path), console, process,
   });
   const { ephemeralFetchConversation: fetch, cacheForTest } = isolated.exports;
   const f = fixture(200);
@@ -156,4 +157,32 @@ test('cache grows beyond payload size but retains only the newest 1000 messages'
   assert.equal(cached.size, 1000);
   assert.equal(Math.min(...Array.from(cached.keys(), Number)), 251);
   assert.equal(Math.max(...Array.from(cached.keys(), Number)), 1250);
+});
+
+test('speaker prefixes default on, can be disabled, and never mutate cached content', async () => {
+  const { shouldPrependSpeaker } = require('../dist/messageFetch');
+  const f = fixture(1);
+  try {
+    delete process.env.CONTENT_PREPEND_SPEAKER;
+    const initial = await fetchHistory(f.channel, 200);
+    assert.equal(initial[0].username, '{{ai}}');
+    assert.equal(initial[0].text, '[{{ai}}]: 1');
+    assert.equal((await fetchHistory(f.channel, 200))[0].text, '[{{ai}}]: 1');
+    for (const value of ['no', 'FALSE', '0']) {
+      process.env.CONTENT_PREPEND_SPEAKER = value;
+      assert.equal((await fetchHistory(f.channel, 200))[0].text, '1');
+    }
+    for (const value of ['yes', ' TRUE ', '1']) {
+      process.env.CONTENT_PREPEND_SPEAKER = value;
+      assert.equal((await fetchHistory(f.channel, 200))[0].text, '[{{ai}}]: 1');
+    }
+    const other = fixture(1, 'other-speaker-test');
+    const result = await fetchHistory(other.channel, 200);
+    assert.equal(result[0].username, 'Other bot');
+    assert.equal(result[0].text, '[Other bot]: 1');
+    process.env.CONTENT_PREPEND_SPEAKER = 'maybe';
+    assert.throws(shouldPrependSpeaker, /CONTENT_PREPEND_SPEAKER/);
+  } finally {
+    process.env.CONTENT_PREPEND_SPEAKER = 'no';
+  }
 });
