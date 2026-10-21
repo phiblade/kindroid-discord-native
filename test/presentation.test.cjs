@@ -22,10 +22,10 @@ const message = (extra = {}) => ({
 const batch = (messages, options = defaultPresentation, max = 4000) =>
   assembleBatch('batch-uuid', '800', messages, max, now, options, 'general');
 
-test('default compact payload has positional metadata, line-based mapping and unchanged text', () => {
+test('default compact payload has positional metadata, line-based mapping and compacted body text', () => {
   assert.equal(
     batch([message()]).payload,
-    '2026-10-22T09:42:15Z\nbatch-uuid | 0\n\n700 Bob\n\n09:41 **Bob**\nHi!\n\nHow are you?',
+    '2026-10-22T09:42:15Z\nbatch-uuid | 0\n\n700 Bob\n\n09:41 **Bob**\nHi!\nHow are you?',
   );
 });
 
@@ -56,7 +56,7 @@ test('all 32 combinations independently control optional metadata in the agreed 
     ]
       .filter(Boolean)
       .join(' ');
-    assert.ok(result.includes('\n\n' + heading + '\nHi!\n\nHow are you?'));
+    assert.ok(result.includes('\n\n' + heading + '\nHi!\nHow are you?'));
   }
 });
 
@@ -138,4 +138,25 @@ test('presentation environment defaults, parsing and invalid values are explicit
       () => loadPresentation({ [key]: 'maybe' }),
       /must be yes or no/,
     );
+});
+
+test('body newline compaction handles CRLF and CR without changing section separators or source', () => {
+  const source = message({ content: 'one\r\n\r\ntwo\r\rthree\n\nfour' });
+  const result = batch([source, message({ id: '124', content: 'next' })]);
+  assert.ok(
+    result.payload.endsWith(
+      '09:41 **Bob**\none\ntwo\nthree\nfour\n\n09:41 **Bob**\nnext',
+    ),
+  );
+  assert.equal(source.content, 'one\r\n\r\ntwo\r\rthree\n\nfour');
+  assert.equal(result.members[0].end, source.content.length);
+});
+
+test('fragment ranges preserve source offsets while collapsing a newline run across a boundary', () => {
+  const content = 'hello\r\n\r\nworld';
+  const source = message({ content, offset: 6 }); // earlier saved fragment ended after CR
+  const result = batch([source]);
+  assert.ok(result.payload.endsWith('[6|end]\nworld'));
+  assert.equal(result.members[0].start, 6);
+  assert.equal(result.members[0].end, content.length);
 });

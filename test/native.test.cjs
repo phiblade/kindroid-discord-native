@@ -755,7 +755,7 @@ test('empty configuration correction still enforces unique kin and active worker
   }
 });
 
-test('compact transcript preserves raw multiline content and hides optional metadata by default', (t) => {
+test('compact transcript compresses repeated newlines and hides optional metadata by default', (t) => {
   const f = fixture(t);
   const { defaultPresentation } = require('../dist/native/presentation');
   f.store.configurePresentation('bridge', defaultPresentation);
@@ -770,7 +770,9 @@ test('compact transcript preserves raw multiline content and hides optional meta
   const batch = f.store.prepare('bridge', Date.UTC(2026, 9, 22, 10));
   assert.ok(batch.payload.startsWith('2026-10-22T10:00:00Z\n'));
   assert.ok(
-    batch.payload.includes('700 Bob* Smith\n\n09:42 **Bob\\* Smith**\n' + text),
+    batch.payload.includes(
+      '700 Bob* Smith\n\n09:42 **Bob\\* Smith**\n' + text.replace(/\n+/g, '\n'),
+    ),
   );
   assert.ok(!batch.payload.includes('message:'));
   assert.ok(!batch.payload.includes('> '));

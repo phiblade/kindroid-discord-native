@@ -23,6 +23,15 @@ function iso(timestamp: number): string {
   return new Date(timestamp).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
+/** Format source ranges without changing the durable source text or offsets. */
+function compactBody(content: string, start: number, end: number): string {
+  let text = content.slice(start, end);
+  // A previous fragment may already have emitted the line break for this run.
+  if (start > 0 && /[\r\n]/.test(content[start - 1]))
+    text = text.replace(/^[\r\n]+/, '');
+  return text.replace(/[\r\n]+/g, '\n');
+}
+
 export function assembleBatch(
   id: string,
   channel: string,
@@ -92,7 +101,7 @@ export function assembleBatch(
         message.offset || end < message.content.length
           ? ` [${message.offset}|${end < message.content.length ? 'more' : 'end'}]`
           : '';
-      return `${heading}${edit}${fragment}\n${message.content.slice(message.offset, end)}`;
+      return `${heading}${edit}${fragment}\n${compactBody(message.content, message.offset, end)}`;
     };
     const payload = (end: number, remaining: number) =>
       header(remaining, mapping) + [...lines, lineFor(end)].join('\n\n');
