@@ -1,7 +1,8 @@
 # Kindroid Discord Native
 
-This repository is the starting point for a durable Discord home-room bridge to Kindroid's native API. Native behavior is currently in design; the code and setup instructions below still describe the inherited Discord-endpoint connector.
+This repository is the starting point for a durable Discord home-room bridge to Kindroid's native API. Milestone 1 now provides SQLite storage and a delivery loop with fake APIs and tests. The live entry point and setup instructions below still describe the inherited Discord-endpoint connector.
 
+- [Run the Milestone 1 simulator and tests](docs/milestone-1.md)
 - [Native bridge design](docs/design.md)
 - [API limits and recovery findings](docs/api-findings.md)
 - [Staged implementation plan](docs/implementation-plan.md)
@@ -23,7 +24,7 @@ A Node.js service that manages multiple Discord bots, each tied to a unique Kind
 
 ## Prerequisites
 
-- Node.js 16.x or higher
+- Node.js 22.13 or higher
 - Discord Bot Token(s) from the [Discord Developer Portal](https://discord.com/developers/applications)
 - Kindroid AI API access (API key and share code)
 

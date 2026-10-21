@@ -1,8 +1,10 @@
 # Native bridge implementation plan
 
-This plan implements [the agreed design](design.md) incrementally. The existing runtime is still the inherited Discord-endpoint bridge. Documentation is the only change in this milestone; do not deploy it expecting native behavior.
+This plan implements [the agreed design](design.md) incrementally. The existing runtime is still the inherited Discord-endpoint bridge. Milestone 1 is implemented and tested against fake APIs; see [its runbook](milestone-1.md). Do not deploy the inherited entry point expecting native behavior.
 
 ## Milestone 1 Storage and delivery simulation
+
+Status: complete for the simulated core. Real API adapters and account-wide throttling remain in later milestones.
 
 Build the SQLite schema, migrations, configuration validation, message boundary, immutable batches, retry state, and one delivery loop per kin. Inject fake Discord and Kindroid transports and a controllable clock. Implement batch sizing with a configurable 4,000-character default assumption, including headers and oversized-message fragments.
 
@@ -31,7 +33,7 @@ Replace share-code calls with native Kin ID delivery. Add the shared account lim
 
 Verify that all substantive replies are posted even when backlog remains. Resume unfinished replies before new generation. API errors are never treated as public speech, and ambiguous posts are never blindly repeated.
 
-Update package identity, runtime README, environment examples, and logs. Remove obsolete Discord-endpoint settings and snapshot assumptions only when their replacements exist. No new GitHub remote is configured yet.
+Update package identity, runtime README, environment examples, and logs. Remove obsolete Discord-endpoint settings and snapshot assumptions only when their replacements exist. The native repository is published at `pzentt/kindroid-discord-native`.
 
 ## Milestone 4 Controlled Railway trial
 
@@ -43,4 +45,4 @@ Run the [API verification checks](api-findings.md#controlled-verification-before
 
 Resolve remaining edit/deletion, mention, attachment, and completed-record retention policies. Document configuration, recovery actions, backups, and known limitations. Consider a database thread, a separate posting loop, or a larger native batch budget only when measured behavior warrants them.
 
-No native implementation, live API calls, deployment changes, or personality updates are included in the documentation task.
+Milestone 1 makes no live API calls, deployment changes, or personality updates. Review its simulation before starting Milestone 2.

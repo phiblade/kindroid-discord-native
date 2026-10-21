@@ -8,9 +8,11 @@
     "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
-    "test": "npm run build && node --test test/*.test.cjs"
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "test": "npm run build && node --test test/*.test.cjs",
+    "test:native": "npm run build && node --test test/native.test.cjs",
+    "simulate:native": "npm run build && node dist/native/simulate.js"
   },
   "keywords": [
     "discord",
@@ -28,7 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
-    "@types/node": "^20.11.19",
+    "@types/node": "^22.20.5",
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
     "eslint": "^8.57.1",
@@ -37,5 +39,8 @@
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

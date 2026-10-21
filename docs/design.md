@@ -1,6 +1,6 @@
 # Native Discord bridge design
 
-Status: agreed behavior and proposed implementation, recorded October 21, 2026. Native behavior is not implemented yet; the repository still contains the original Discord-endpoint connector.
+Status: agreed behavior and proposed implementation, recorded October 21, 2026. The Milestone 1 storage and delivery simulation is implemented; live adapters are not. The live entry point still runs the original Discord-endpoint connector. See [the Milestone 1 runbook](milestone-1.md).
 
 The bridge connects one Discord bot and its home channel to one dedicated Kindroid conversation. It saves incoming messages durably, delivers pending messages in order, and lets the kin decide when to speak. The user manages exclusive use of the kin and its personality configuration.
 
@@ -19,20 +19,20 @@ The bridge connects one Discord bot and its home channel to one dedicated Kindro
 
 Standing protocol instructions belong in the kin's personality configuration, installed manually by the user. They explain the home room, speaker labels, remaining-message count, and control replies. The bridge never automatically overwrites the kin's personality, resets its chat, or rewinds it.
 
-Proposed batch envelope:
+Batch envelope (message entries use JSON strings to delimit speaker and text):
 
 ```text
 Batch: 019-example-batch-id
 Channel: #homeroom
 Messages remaining after this batch: 23
 
-[bob]: Hello everyone.
-[phil]: Hi, Bob.
+{"id":"123","speaker":"bob","version":0,"offset":0,"continued":false,"text":"Hello everyone."}
+{"id":"124","speaker":"phil","version":0,"offset":0,"continued":false,"text":"Hi, Bob."}
 ```
 
 The remaining count is a snapshot when the batch is assembled. More messages can arrive during generation. `more.` does not cause an empty request; the delivery loop follows the durable pending queue. `none.` still counts as a successful exchange. API errors and empty responses are operational outcomes, not public speech.
 
-The proposed batch marker supports uncertain-delivery reconciliation. Verify that native history preserves it before depending on matching. Display names are presentation labels; Discord author and message IDs remain the durable identities. Content must be represented so participants cannot accidentally impersonate envelope metadata or another speaker through line breaks; finalize escaping with protocol tests.
+The proposed batch marker supports uncertain-delivery reconciliation. Verify that native history preserves it before depending on matching. Display names are presentation labels; Discord author and message IDs remain the durable identities. JSON encoding keeps embedded line breaks inside the text field; protocol tests verify this representation.
 
 ## Input budget
 
