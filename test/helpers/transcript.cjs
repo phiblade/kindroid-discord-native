@@ -1,6 +1,9 @@
 // Test fixtures enable message IDs. Production never parses these transcripts.
 exports.entries = (batch) => {
-  const body = batch.payload.slice(batch.payload.indexOf('\n\n') + 2);
+  const speakersStart = batch.payload.indexOf('\n\n') + 2;
+  const body = batch.payload.slice(
+    batch.payload.indexOf('\n\n', speakersStart) + 2,
+  );
   const headers = [
     ...body.matchAll(
       /^(\d+) (?:\d{2}\/\d{2} )?(?:\d{2}:\d{2} )?\*\*[^\n]*?\*\*(?: \[~[^\n]*?\])?(?: \[(\d+)\|(?:more|end)\])?\n/gm,

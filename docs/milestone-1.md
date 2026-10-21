@@ -61,7 +61,7 @@ The loop is awakened by ingestion, startup, or an injected clock. Multiple wakeu
 
 ## Payloads and replies
 
-Each batch carries an ID, home-channel ID, and remaining-message count. Message entries now use the [compact transcript](milestone-3.md#compact-transcript-format), with configurable message metadata, a quoted speaker-to-author-ID map and unchanged body text. Edit and fragment markers appear only when relevant. This defines syntax, not a guarantee that a language model cannot be influenced by participant content.
+Each batch carries an ID, home-channel ID, and remaining-message count. Message entries now use the [compact transcript](milestone-3.md#compact-transcript-format), with configurable message metadata, an ID-first speaker list and unchanged body text. Edit and fragment markers appear only when relevant. This defines syntax, not a guarantee that a language model cannot be influenced by participant content.
 
 Batch membership records exact source ranges. On confirmation, offsets advance atomically with the saved reply and outgoing chunks. A long source message is delivered only after all fragments complete. Confirmed fragments are not resent.
 

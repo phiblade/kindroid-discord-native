@@ -71,9 +71,8 @@ export function assembleBatch(
       iso(now),
       ...(room ? [room] : []),
       `${id} | ${remaining}`,
-      [...mapping]
-        .map(([name, author]) => `${JSON.stringify(name)}=${author}`)
-        .join('; '),
+      '',
+      [...mapping].map(([name, author]) => `${author} ${name}`).join('\n'),
     ].join('\n') + '\n\n';
   for (const message of pending) {
     const label = labels.get(keyFor(message))!;

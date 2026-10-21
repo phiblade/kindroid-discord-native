@@ -22,10 +22,10 @@ const message = (extra = {}) => ({
 const batch = (messages, options = defaultPresentation, max = 4000) =>
   assembleBatch('batch-uuid', '800', messages, max, now, options, 'general');
 
-test('default compact payload has positional metadata, quoted mapping and unchanged text', () => {
+test('default compact payload has positional metadata, line-based mapping and unchanged text', () => {
   assert.equal(
     batch([message()]).payload,
-    '2026-10-22T09:42:15Z\nbatch-uuid | 0\n"Bob"=700\n\n09:41 **Bob**\nHi!\n\nHow are you?',
+    '2026-10-22T09:42:15Z\nbatch-uuid | 0\n\n700 Bob\n\n09:41 **Bob**\nHi!\n\nHow are you?',
   );
 });
 
@@ -44,12 +44,9 @@ test('all 32 combinations independently control optional metadata in the agreed 
       .join(' | ');
     assert.equal(
       result.split('\n\n')[0],
-      [
-        '2026-10-22T09:42:15Z',
-        ...(room ? [room] : []),
-        'batch-uuid | 0',
-        '"Bob"=700',
-      ].join('\n'),
+      ['2026-10-22T09:42:15Z', ...(room ? [room] : []), 'batch-uuid | 0'].join(
+        '\n',
+      ),
     );
     const heading = [
       options.messageId ? '123' : '',
@@ -63,7 +60,7 @@ test('all 32 combinations independently control optional metadata in the agreed 
   }
 });
 
-test('speaker names quote delimiters and escape quotes/backslashes while normalizing newlines', () => {
+test('speaker names preserve spaces and symbols verbatim while normalizing newlines', () => {
   const names = [
     'First Last',
     'Bob; the Builder=Boss',
@@ -76,10 +73,8 @@ test('speaker names quote delimiters and escape quotes/backslashes while normali
   );
   const result = batch(messages).payload;
   assert.equal(
-    result.split('\n')[2],
-    names
-      .map((name, i) => `${JSON.stringify(name.replace('\n', ' '))}=${700 + i}`)
-      .join('; '),
+    result.split('\n\n')[1],
+    names.map((name, i) => `${700 + i} ${name.replace('\n', ' ')}`).join('\n'),
   );
 });
 
@@ -89,7 +84,7 @@ test('speaker mapping deduplicates names and disambiguates different authors wit
     message({ id: '124' }),
     message({ id: '125', author_id: '701' }),
   ]).payload;
-  assert.equal(result.split('\n')[2], '"Bob (700)"=700; "Bob (701)"=701');
+  assert.equal(result.split('\n\n')[1], '700 Bob (700)\n701 Bob (701)');
   assert.equal(result.split('**Bob \\(700\\)**').length - 1, 2);
 });
 

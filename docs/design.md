@@ -24,7 +24,9 @@ Batch envelope (compact positional transcript, default switches):
 ```text
 2026-10-22T09:42:15Z
 9c78273d-48e1-4e84-b7fd-4f0a92b51366 | 0
-"Bob"=234567890123456789; "Phil"=345678901234567890
+
+234567890123456789 Bob
+345678901234567890 Phil
 
 09:41 **Bob**
 Hey, how's everyone doing?
@@ -33,7 +35,7 @@ Hey, how's everyone doing?
 Pretty good. What do you think, Kin?
 ```
 
-The preparation timestamp and batch ID/count are always present. Room name/ID, message ID, date, and time are individually configurable; only message time defaults on. Names in the speaker mapping are JSON-quoted, with embedded newlines normalized to spaces. The original body is unquoted and unchanged. See [the current protocol and switches](milestone-3.md#compact-transcript-format).
+The preparation timestamp and batch ID/count are always present. Room name/ID, message ID, date, and time are individually configurable; only message time defaults on. The speaker list is separated from the metadata and messages by blank lines. Each line starts with a numeric author ID and a space, followed by the entire display name. Embedded newlines are normalized to spaces; other characters are preserved without added quoting or escaping. The original body is unquoted and unchanged. See [the current protocol and switches](milestone-3.md#compact-transcript-format).
 
 The remaining count is a snapshot when the batch is assembled. More messages can arrive during generation. `more.` does not cause an empty request; the delivery loop follows the durable pending queue. `none.` still counts as a successful exchange. API errors and empty responses are operational outcomes, not public speech.
 

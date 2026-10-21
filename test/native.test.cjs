@@ -770,9 +770,7 @@ test('compact transcript preserves raw multiline content and hides optional meta
   const batch = f.store.prepare('bridge', Date.UTC(2026, 9, 22, 10));
   assert.ok(batch.payload.startsWith('2026-10-22T10:00:00Z\n'));
   assert.ok(
-    batch.payload.includes(
-      '"Bob* Smith"=700\n\n09:42 **Bob\\* Smith**\n' + text,
-    ),
+    batch.payload.includes('700 Bob* Smith\n\n09:42 **Bob\\* Smith**\n' + text),
   );
   assert.ok(!batch.payload.includes('message:'));
   assert.ok(!batch.payload.includes('> '));
