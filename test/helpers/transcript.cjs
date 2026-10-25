@@ -6,7 +6,7 @@ exports.entries = (batch) => {
   );
   const headers = [
     ...body.matchAll(
-      /^(\d+) (?:\d{2}\/\d{2} )?(?:\d{2}:\d{2} )?\*\*[^\n]*?\*\*(?: \[~[^\n]*?\])?(?: \[(\d+)\|(?:more|end)\])?\n/gm,
+      /^(\d+) (?:\d{4}-\d{2}-\d{2} )?(?:\d{2}:\d{2} UTC )?\*\*[^\n]*?\*\*(?: \[~[^\n]*?\])?(?: \[(\d+)\|(?:more|end)\])?\n/gm,
     ),
   ];
   return headers.map((match, i) => ({

@@ -771,7 +771,7 @@ test('compact transcript compresses repeated newlines and hides optional metadat
   assert.ok(batch.payload.startsWith(batch.id + '\n'));
   assert.ok(
     batch.payload.includes(
-      '700 Bob* Smith\n\n10/21 09:42 **Bob\\* Smith**\n' +
+      '700 Bob* Smith\n\n2026-10-21 09:42 UTC **Bob\\* Smith**\n' +
         text.replace(/\n+/g, '\n'),
     ),
   );
@@ -808,5 +808,7 @@ test('presentation changes affect new batches only and do not require a configur
   f.store.ingest('bridge', message(2, 'second'));
   const next = f.store.prepare('bridge', 3000);
   assert.ok(next.payload.startsWith(next.id + '\n#actual-room | 800\n'));
-  assert.ok(next.payload.includes('\n\n01/01 00:00 **Alice**\nsecond'));
+  assert.ok(
+    next.payload.includes('\n\n1970-01-01 00:00 UTC **Alice**\nsecond'),
+  );
 });

@@ -25,7 +25,7 @@ const batch = (messages, options = defaultPresentation, max = 4000) =>
 test('default compact payload has positional metadata, line-based mapping and compacted body text', () => {
   assert.equal(
     batch([message()]).payload,
-    'batch-uuid\n700 Bob\n\n10/21 09:41 **Bob**\nHi!\nHow are you?\n\n0',
+    'batch-uuid\n700 Bob\n\n2026-10-21 09:41 UTC **Bob**\nHi!\nHow are you?\n\n0',
   );
 });
 
@@ -48,8 +48,8 @@ test('all 32 combinations independently control optional metadata in the agreed 
     );
     const heading = [
       options.messageId ? '123' : '',
-      options.date ? '10/21' : '',
-      options.time ? '09:41' : '',
+      options.date ? '2026-10-21' : '',
+      options.time ? '09:41 UTC' : '',
       '**Bob**',
     ]
       .filter(Boolean)
@@ -146,7 +146,7 @@ test('body newline compaction handles CRLF and CR without changing section separ
   const result = batch([source, message({ id: '124', content: 'next' })]);
   assert.ok(
     result.payload.endsWith(
-      '10/21 09:41 **Bob**\none\ntwo\nthree\nfour\n\n10/21 09:41 **Bob**\nnext\n\n0',
+      '2026-10-21 09:41 UTC **Bob**\none\ntwo\nthree\nfour\n\n2026-10-21 09:41 UTC **Bob**\nnext\n\n0',
     ),
   );
   assert.equal(source.content, 'one\r\n\r\ntwo\r\rthree\n\nfour');

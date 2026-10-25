@@ -86,8 +86,8 @@ export function assembleBatch(
     const stamp = iso(message.timestamp);
     const heading = [
       options.messageId ? message.id : '',
-      options.date ? `${stamp.slice(5, 7)}/${stamp.slice(8, 10)}` : '',
-      options.time ? stamp.slice(11, 16) : '',
+      options.date ? stamp.slice(0, 10) : '',
+      options.time ? `${stamp.slice(11, 16)} UTC` : '',
       `**${markdown(label)}**`,
     ]
       .filter(Boolean)

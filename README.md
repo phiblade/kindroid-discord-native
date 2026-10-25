@@ -49,10 +49,10 @@ A default delivery looks like this:
 234567890123456789 Bob
 345678901234567890 Phil
 
-10/21 09:41 **Bob**
+2026-10-21 09:41 UTC **Bob**
 Hey, how's everyone doing?
 
-10/21 09:42 **Phil**
+2026-10-21 09:42 UTC **Phil**
 Pretty good. What do you think?
 
 0
@@ -80,7 +80,7 @@ CONTENT_PREPEND_ROOM_LABEL=no
 CONTENT_PREPEND_ROOM_ID=no
 ```
 
-Message headers put enabled fields in this order: message ID, `MM/DD`, `HH:mm`, then the bold speaker name. Enabled room metadata appears immediately after the batch ID. Restart after changing settings; only newly prepared batches use the new format. Saved batches keep their original text for retries and recovery.
+Message headers put enabled fields in this order: message ID, `YYYY-MM-DD`, `HH:mm UTC`, then the bold speaker name. Enabled room metadata appears immediately after the batch ID. Restart after changing settings; only newly prepared batches use the new format. Saved batches keep their original text for retries and recovery.
 
 See [`.env.example`](.env.example) for batch-size, timeout, and retry settings. The default complete-message budget is 4,000 UTF-16 units, including metadata; this is an initial assumption based on the chat limit, not a verified native API maximum.
 
